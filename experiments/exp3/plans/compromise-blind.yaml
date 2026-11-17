@@ -1,0 +1,12 @@
+# PROPOSED (worklog section 4, P-6): host compromise: the target node stops reporting one event
+# family (net.connect) 1 s after its first escape-class record.
+version: faultplan.v0
+seed: 3500
+target: first-priority-ebpf
+faults:
+  - id: compromise-blind
+    kind: blind
+    stage: source
+    nodes: target
+    after: "target+1s"
+    select: {event_families: [net.connect]}

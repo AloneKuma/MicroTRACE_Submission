@@ -1,0 +1,7 @@
+# Non-GO timing units (system other than go in the pass list): shell commands run by exp4.py cmdstep
+# under /usr/bin/time and the unit's cap (caps.tsv row <command>:<action>). A command whose work runs
+# elsewhere writes its own wall/CPU/memory to $EXP4_STEP_JSON (orthrus_step.sh does).
+command	prep_cmd	train_cmd	detect_cmd
+orthrus	bash experiments/exp4/orthrus_step.sh prep	bash experiments/exp4/orthrus_step.sh train	bash experiments/exp4/orthrus_step.sh detect
+stub	python -c "print(1)"	python -c "sum(i*i for i in range(3*10**6))"	python -c "sum(i*i for i in range(10**6))"
+stub_slow	python -c "print(1)"	python -c "import time; time.sleep(30)"	python -c "import time; time.sleep(30)"

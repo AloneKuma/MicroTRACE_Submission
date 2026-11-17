@@ -1,0 +1,210 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MicroTRACE Run Matrix Schema",
+  "description": "Machine-readable specification of the dataset generation matrix: scenario-to-run-ID mappings, world sizes, seeds, and split assignments",
+  "type": "object",
+  "required": ["matrix_version", "frozen", "scenario_catalogue_version"],
+  "properties": {
+    "matrix_version": {
+      "type": "string",
+      "pattern": "^run-matrix\\.v[0-9]+$",
+      "description": "Run matrix schema version"
+    },
+    "frozen": {
+      "type": "boolean",
+      "description": "Whether this matrix has been frozen and is ready for HELD_OUT generation"
+    },
+    "frozen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when matrix was frozen (required if frozen=true)"
+    },
+    "frozen_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of frozen matrix content (required if frozen=true)"
+    },
+    "scenario_catalogue_version": {
+      "type": "string",
+      "description": "Frozen scenario catalogue version or commit hash"
+    },
+    "generator_spec_version": {
+      "type": "string",
+      "pattern": "^generator-spec\\.v[0-9]+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Overall matrix description and tuning notes"
+    },
+    "coverage_analysis": {
+      "type": "object",
+      "description": "Coverage of findings and scenarios across the matrix",
+      "properties": {
+        "total_runs": { "type": "integer" },
+        "findings_coverage": {
+          "type": "object",
+          "description": "Per-finding repetition counts by state",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "PRESENT": { "type": "integer" },
+              "ABSENT": { "type": "integer" },
+              "UNOBSERVABLE": { "type": "integer" }
+            }
+          }
+        },
+        "scenario_count_by_kind": {
+          "type": "object",
+          "description": "Count of scenarios by kind in the matrix",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "splits": {
+      "type": "object",
+      "description": "Dataset split definitions",
+      "properties": {
+        "PILOT": {
+          "$ref": "#/definitions/split_definition"
+        },
+        "RESEARCH": {
+          "$ref": "#/definitions/split_definition"
+        },
+        "HELD_OUT": {
+          "$ref": "#/definitions/split_definition"
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "description": "Array of run specifications",
+      "items": {
+        "$ref": "#/definitions/run_spec"
+      }
+    },
+    "nuisance_check": {
+      "type": "object",
+      "description": "Nuisance predictor threshold and validation settings",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Maximum predictor accuracy threshold on held-out runs"
+        },
+        "baseline_accuracy": {
+          "type": "number",
+          "description": "Baseline accuracy on PILOT runs"
+        },
+        "features_used": {
+          "type": "array",
+          "description": "Features allowed in nuisance predictor",
+          "items": {
+            "type": "string",
+            "enum": ["capture_profile", "run_duration", "source_presence", "workload_identity", "timing_patterns"]
+          }
+        }
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "description": "Determinism contract for the frozen matrix",
+      "properties": {
+        "seed_allocation": {
+          "type": "string",
+          "description": "How seeds are allocated (e.g., 'scenario_id + variant + split + index')"
+        },
+        "seed_generation": {
+          "type": "string",
+          "description": "Seed derivation algorithm (e.g., 'SHA256(scenario_id + variant + split + index)')"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "split_definition": {
+      "type": "object",
+      "description": "Definition of a dataset split",
+      "properties": {
+        "description": { "type": "string" },
+        "purpose": { "type": "string" },
+        "run_count": { "type": "integer" },
+        "visible_to_agents": { "type": "boolean" },
+        "visible_to_baselines": { "type": "boolean" },
+        "visible_to_thresholds": { "type": "boolean" },
+        "template_pool": {
+          "type": "string",
+          "enum": ["DEV", "HELD_OUT_POOL"],
+          "description": "Which template pool is used"
+        }
+      }
+    },
+    "run_spec": {
+      "type": "object",
+      "required": ["run_id", "split", "world_name", "scenario_id", "scenario_variant"],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique run identifier"
+        },
+        "split": {
+          "type": "string",
+          "enum": ["PILOT", "RESEARCH", "HELD_OUT"],
+          "description": "Dataset split for this run"
+        },
+        "world_name": {
+          "type": "string",
+          "enum": ["Small", "Reference", "Large"],
+          "description": "World topology to use"
+        },
+        "scenario_id": {
+          "type": "string",
+          "description": "Scenario catalogue entry ID"
+        },
+        "scenario_variant": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Variant index within scenario; for a multi-scenario run, the round's variant index (0 = v1)"
+        },
+        "scenario_variants": {
+          "type": "string",
+          "description": "Scenarios of a multi-scenario run that run a variant other than v1, as 'scenario_id=variant_id,...' (passed to mtgen build --variants; part of the run_id)"
+        },
+        "catalogue_overlays": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Repository-relative catalogue overlay files whose scenarios the run may use (mtgen build --catalogue-overlay; add-on sets only, D-31)"
+        },
+        "generator_flags": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["gateway_internal_listener", "ebpf_accept"] },
+          "description": "Generator flags of the run (mtgen build --flags; part of the run_id). Off in PILOT."
+        },
+        "observability_profile": {
+          "type": "string",
+          "enum": ["clean", "degraded_gateway", "degraded_audit", "degraded_ebpf", "degraded_context"],
+          "description": "Observability profile for this run"
+        },
+        "seed_generator": {
+          "type": "integer",
+          "description": "Deterministic seed for world generation"
+        },
+        "seed_scenario": {
+          "type": "integer",
+          "description": "Deterministic seed for scenario variant selection"
+        },
+        "description": {
+          "type": "string",
+          "description": "Run-specific notes (e.g., 'baseline control', 'A1 focus')"
+        },
+        "expected_findings": {
+          "type": "array",
+          "description": "Finding types expected to be PRESENT in this run",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

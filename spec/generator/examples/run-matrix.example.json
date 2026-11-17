@@ -1,0 +1,270 @@
+{
+  "matrix_version": "run-matrix.v0",
+  "frozen": false,
+  "scenario_catalogue_version": "5f2b3c8d7e9a1c0e4f1b8a2c9d3e5f7a",
+  "generator_spec_version": "generator-spec.v0",
+  "description": "Example run matrix for MicroTRACE dataset generation: PILOT and RESEARCH runs covering all 17 included findings with positive, negative, and unobservable variants. HELD_OUT matrix (not shown) will use unseen world/scenario combinations with independent seeds.",
+  "coverage_analysis": {
+    "total_runs": 42,
+    "findings_coverage": {
+      "A1": { "PRESENT": 4, "ABSENT": 3, "UNOBSERVABLE": 2 },
+      "A2": { "PRESENT": 2, "ABSENT": 2, "UNOBSERVABLE": 1 },
+      "B1": { "PRESENT": 2, "ABSENT": 2, "UNOBSERVABLE": 1 },
+      "B2": { "PRESENT": 1, "ABSENT": 2, "UNOBSERVABLE": 2 },
+      "B3": { "PRESENT": 2, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "C1a": { "PRESENT": 2, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "C1b": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "D1": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "E1": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "E2": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "F1": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "G1a": { "PRESENT": 2, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "G2": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "H1": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "H2": { "PRESENT": 2, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "H3": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 },
+      "H4": { "PRESENT": 1, "ABSENT": 1, "UNOBSERVABLE": 1 }
+    },
+    "scenario_count_by_kind": {
+      "attack": 20,
+      "lookalike": 19,
+      "degraded": 18,
+      "nonlink": 4,
+      "benign_workload": 4,
+      "admin": 4
+    }
+  },
+  "splits": {
+    "PILOT": {
+      "description": "Tuning and pilot runs covering all scenarios and findings",
+      "purpose": "Pilot numeric parameters, baselines, nuisance threshold, and repetition counts; frozen before RESEARCH and HELD_OUT",
+      "run_count": 24,
+      "visible_to_agents": true,
+      "visible_to_baselines": true,
+      "visible_to_thresholds": true,
+      "template_pool": "DEV"
+    },
+    "RESEARCH": {
+      "description": "Additional research runs for variant coverage",
+      "purpose": "Extend scenario coverage and variant testing beyond PILOT (added after pilot freeze)",
+      "run_count": 12,
+      "visible_to_agents": true,
+      "visible_to_baselines": true,
+      "visible_to_thresholds": false,
+      "template_pool": "DEV"
+    },
+    "HELD_OUT": {
+      "description": "Sealed evaluation runs with unseen world/scenario combinations",
+      "purpose": "Final evaluation with independent seeds and world variants not seen in PILOT/RESEARCH",
+      "run_count": 50,
+      "visible_to_agents": false,
+      "visible_to_baselines": false,
+      "visible_to_thresholds": false,
+      "template_pool": "HELD_OUT_POOL"
+    }
+  },
+  "nuisance_check": {
+    "enabled": true,
+    "threshold": 0.65,
+    "baseline_accuracy": 0.52,
+    "features_used": ["capture_profile", "run_duration", "source_presence", "workload_identity"]
+  },
+  "determinism": {
+    "seed_allocation": "scenario_id + variant + split + index",
+    "seed_generation": "SHA256(scenario_id || variant || split || index)"
+  },
+  "runs": [
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440001",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "a1_lid_ds_upload",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 1001,
+      "seed_scenario": 2001,
+      "description": "A1 positive: LID-DS PHP file-upload web shell (reproduced/rulebook-shaped)",
+      "expected_findings": ["A1", "H2"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440002",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "a1_lid_ds_upload",
+      "scenario_variant": 1,
+      "observability_profile": "clean",
+      "seed_generator": 1002,
+      "seed_scenario": 2002,
+      "description": "A1 positive: LID-DS PHP upload (non-rulebook variant; different technique)",
+      "expected_findings": ["A1", "H2"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440003",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "a1_benign_json_injection_token",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 1003,
+      "seed_scenario": 2003,
+      "description": "A1 negative (lookalike): benign request with injection pattern tokens inside JSON field",
+      "expected_findings": []
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440004",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "a1_missing_gateway_observer",
+      "scenario_variant": 0,
+      "observability_profile": "degraded_gateway",
+      "seed_generator": 1004,
+      "seed_scenario": 2004,
+      "description": "A1 unobservable: attack but gateway observer gap",
+      "expected_findings": []
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440005",
+      "split": "PILOT",
+      "world_name": "Reference",
+      "scenario_id": "a2_kube_ids0_sqli",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 2001,
+      "seed_scenario": 3001,
+      "description": "A2 positive: Kube-IDS0 DVWA SQLi injection success indicators (reproduced)",
+      "expected_findings": ["A1", "A2"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440006",
+      "split": "PILOT",
+      "world_name": "Reference",
+      "scenario_id": "b1_resource_enumeration",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 2002,
+      "seed_scenario": 3002,
+      "description": "B1 positive: external cloud service discovery (MITRE T1526)",
+      "expected_findings": ["B1"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440007",
+      "split": "PILOT",
+      "world_name": "Reference",
+      "scenario_id": "b1_benign_operator_discovery",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 2003,
+      "seed_scenario": 3003,
+      "description": "B1 negative (lookalike): legitimate operator kubectl discovery (from K8NTEXT)",
+      "expected_findings": []
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440008",
+      "split": "PILOT",
+      "world_name": "Reference",
+      "scenario_id": "b1_offline_audit",
+      "scenario_variant": 0,
+      "observability_profile": "degraded_audit",
+      "seed_generator": 2004,
+      "seed_scenario": 3004,
+      "description": "B1 unobservable: enumeration but audit feed gap",
+      "expected_findings": []
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440009",
+      "split": "PILOT",
+      "world_name": "Large",
+      "scenario_id": "f1_privilege_escalation",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 3001,
+      "seed_scenario": 4001,
+      "description": "F1 positive: CADETS Nginx exploit → privilege escalation to euid=0 (adapted to container)",
+      "expected_findings": ["F1"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440010",
+      "split": "PILOT",
+      "world_name": "Large",
+      "scenario_id": "h2_external_connect",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 3002,
+      "seed_scenario": 4002,
+      "description": "H2 positive: outbound connect to external destination (LID-DS wget, BETH shell, CADETS)",
+      "expected_findings": ["H2"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440011",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "h4_sensitive_read_connect",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 1010,
+      "seed_scenario": 2010,
+      "description": "H4 positive: CVE-2020-9484 Tomcat RCE → sensitive file read (/etc/passwd) → external connect",
+      "expected_findings": ["H4"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440012",
+      "split": "PILOT",
+      "world_name": "Small",
+      "scenario_id": "h4_read_without_connect",
+      "scenario_variant": 0,
+      "observability_profile": "degraded_ebpf",
+      "seed_generator": 1011,
+      "seed_scenario": 2011,
+      "description": "H4 unobservable: sensitive read present but external connection not observed",
+      "expected_findings": []
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440013",
+      "split": "RESEARCH",
+      "world_name": "Reference",
+      "scenario_id": "c1a_container_escape",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 2020,
+      "seed_scenario": 3020,
+      "description": "C1a positive: namespace escape with capability change (MITRE T1611)",
+      "expected_findings": ["C1a"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440014",
+      "split": "RESEARCH",
+      "world_name": "Reference",
+      "scenario_id": "d1_token_theft",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 2021,
+      "seed_scenario": 3021,
+      "description": "D1 positive: token read from unexpected process (MITRE T1528)",
+      "expected_findings": ["D1"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440015",
+      "split": "RESEARCH",
+      "world_name": "Large",
+      "scenario_id": "g1a_port_scan",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 3010,
+      "seed_scenario": 4010,
+      "description": "G1a positive: network port scan of in-cluster endpoints (CADETS adapted)",
+      "expected_findings": ["G1a"]
+    },
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440016",
+      "split": "RESEARCH",
+      "world_name": "Large",
+      "scenario_id": "g2_stolen_credential_exec",
+      "scenario_variant": 0,
+      "observability_profile": "clean",
+      "seed_generator": 3011,
+      "seed_scenario": 4011,
+      "description": "G2 positive: exec with stolen credential (inherited from previous action)",
+      "expected_findings": ["G2"]
+    }
+  ]
+}

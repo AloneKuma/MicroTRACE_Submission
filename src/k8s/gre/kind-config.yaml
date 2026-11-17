@@ -1,0 +1,45 @@
+# The GRE test cluster (build step 7; evaluation-plan.md section 5).
+# gre-kind-up.sh fills in __AUDIT_POLICY__ with an absolute path. Calico
+# replaces kindnet because kindnet does not enforce NetworkPolicy, and the
+# isolate action is only effective where it is enforced.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: microtrace-gre
+networking:
+  disableDefaultCNI: true
+  podSubnet: 192.168.0.0/16
+nodes:
+  - role: control-plane
+    image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+    kubeadmConfigPatches:
+      - |
+        kind: ClusterConfiguration
+        apiServer:
+          extraArgs:
+            audit-log-path: /var/log/kubernetes/kube-apiserver-audit.log
+            audit-policy-file: /etc/kubernetes/policies/audit-policy.yaml
+            audit-log-maxbackup: "10"
+            audit-log-maxsize: "100"
+          extraVolumes:
+            - name: audit-policies
+              hostPath: /etc/kubernetes/policies
+              mountPath: /etc/kubernetes/policies
+              readOnly: true
+              pathType: DirectoryOrCreate
+            - name: audit-logs
+              hostPath: /var/log/kubernetes
+              mountPath: /var/log/kubernetes
+              readOnly: false
+              pathType: DirectoryOrCreate
+    extraMounts:
+      - hostPath: __AUDIT_POLICY__
+        containerPath: /etc/kubernetes/policies/audit-policy.yaml
+        readOnly: true
+  - role: worker                     # the application workloads
+    image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+    labels:
+      microtrace.io/role: app
+  - role: worker                     # the cordon target; nothing pinned to it
+    image: kindest/node:v1.35.8@sha256:07b2536e30b803ed61d1677a79df6115f798ce64c80f9e22f6ed45afd09323c0
+    labels:
+      microtrace.io/role: spare

@@ -1,0 +1,13 @@
+# TGS gap-analysis template (tgs-contract.md section 5). Shared task
+# knowledge for both Exp. 5 investigators: finding types and tactics only,
+# never instance values (UIDs, names, times, or which stage is missing).
+# The sources that can supply each stage are derived from the rulebook.
+template_version: tgs-template.v0
+id: chain-2-escape-exfil
+status: provisional     # until the dataset build fixes the Exp. 5 chain families
+basis: docs/design/design-spec.md section 3, Chain 2
+stages:
+  - {id: injection, finding_types: [A2], tactic: INITIAL_ACCESS, required: true}
+  - {id: runtime-escape, finding_types: [C1b], tactic: PRIVILEGE_ESCALATION, required: true}
+  - {id: off-node-exfiltration, finding_types: [H5], tactic: EXFILTRATION, required: true}
+  - {id: on-node-transfer, finding_types: [H4], tactic: EXFILTRATION, required: false}  # degraded after the escape

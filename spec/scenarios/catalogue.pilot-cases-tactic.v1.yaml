@@ -1,0 +1,309 @@
+# MicroTRACE scenario catalogue overlay: No-Tactic cases for the pilot-cases
+# add-on set (docs/plans/exp2-no-tactic-cases-plan.md, S1; v1 after the D-4
+# review of v0, section 9).
+#
+# Status: draft
+#
+# A separate file, so catalogue.pilot-cases.v0.yaml keeps the hash its 40
+# runs recorded. Runs that use these scenarios name both overlays and set the
+# same generator flags as pilot-cases. v0 stays as the 20 v0 runs recorded it.
+#
+# v1 changes (review of v0, 2026-10-27): the application's benign H2 steps
+# are their own incident; gaps are drawn with after: (D1 -> H4 6.1-20 s), so
+# the case holds at every draw; the mirror tactic_ancestor_c2 (whose links
+# are all unmapped, so No-Tactic cannot change its ranks) is replaced by
+# tactic_ancestor_forward, where the tactic weight drops a true chain.
+#
+# D-4: entries are reviewed by someone other than their author.
+
+version: catalogue.pilot-cases-tactic.v1
+status: draft
+coverage_required: false
+author: "claude (exp2-no-tactic-cases-plan S1, 2026-10-27)"
+reviewer: "claude subagent, independent of the author session (v0 review and v1 re-review, 2026-10-27); a human D-4 review is still open"
+
+scenarios:
+  # ========== No-Tactic: an ancestor's lookalikes (plan section 3) ==========
+
+  - id: tactic_ancestor_lookalike
+    kind: attack
+    title: "No-Tactic: an agent steals the token and exfiltrates while the application connects out"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1528 Steal Application Access Token; T1041 Exfiltration Over C2 Channel"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (exp2-no-tactic-cases-plan S1, 2026-10-27)"
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    adaptation_note: |
+      An agent the attacker started in the Pod (by a route outside the
+      application; like every process in the Pod, it descends from the
+      Pod's init process, the application) reads the ServiceAccount token
+      (D1, credential access) and 6-20 s later reads /etc/shadow and sends
+      it out (H4, exfiltration): one forward step along the ATT&CK tactic
+      order. The upload goes to a destination already in the workload's H2
+      set, so the agent's chain has no H2. 1-5 s before the upload the
+      application itself connects to two destinations new to the workload
+      (a telemetry endpoint and a CDN; H2, no tactic), its own benign
+      incident. Ancestry holds from the application to the agent, so the
+      correlator can confirm app H2 -> agent H4; the pair carries no truth
+      link (a hard nonlink needs a witness that does not hold, verify
+      link_witness), so a retained path through it is a false chain. The
+      tactic weight ranks the forward D1 -> H4 above the unmapped
+      lookalikes; without it the tighter lookalikes win the K path slots
+      (test_orch_groups, at the ends of the gap ranges).
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.cache/agent
+          argv: [/tmp/.cache/agent]
+        outcome: success
+        expects: []
+      - step: 2
+        action: read_token_file
+        intended_tactic: CREDENTIAL_ACCESS
+        params:
+          reader_process: "@step1.process"
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers"
+      - step: 3
+        action: connect_external
+        benign: true
+        incident: app_traffic
+        after: {step: 2, gap_s: [5, 15]}
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.87
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The application connects to a telemetry endpoint new to the workload: a real unseen destination, not part of the chain"
+      - step: 4
+        action: connect_external
+        benign: true
+        incident: app_traffic
+        after: {step: 3, gap_s: [0.2, 1]}
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.91
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The application connects to a CDN new to the workload: a real unseen destination, not part of the chain"
+      - step: 5
+        action: read_sensitive_file
+        after: {step: 4, gap_s: [0.5, 2]}
+        params:
+          reader_process: "@step1.process"
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects:
+          - finding: H4
+            state: UNOBSERVABLE
+            reason: "Read alone without outbound connect"
+      - step: 6
+        action: connect_external
+        after: {step: 5, gap_s: [0.2, 1]}
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []          # a destination in the workload's H2 set
+      - step: 7
+        action: egress_transfer
+        after: {step: 6, gap_s: [0.2, 1]}
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          destination: 203.0.113.10
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+    links:
+      - from: 2
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the agent that stole the token exfiltrates"
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: tactic_ancestor_forward
+    kind: attack
+    title: "No-Tactic mirror: a helper's token reads precede an attack that starts with an unmapped connect"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1071 Application Layer Protocol; T1041 Exfiltration Over C2 Channel"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (exp2-no-tactic-cases-plan S1 v1, 2026-10-27)"
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    adaptation_note: |
+      The mirror of tactic_ancestor_lookalike, with the roles of the
+      tactics swapped (plan decision T-b; v1 after the D-4 review): here
+      the ancestor's benign findings are forward-mapped and the true chain
+      starts unmapped. The application's metrics helper reads the
+      ServiceAccount token twice, 7-12 s apart, for its own API calls (D1,
+      D1: it is not an expected reader; benign, its own incident). The
+      helper is then exploited (6.2-13 s later) and spawns an agent; the
+      agent connects to a C2 server new to the workload (H2, no tactic) and
+      its child reads /etc/shadow and sends it out 0.6-3 s later (H4,
+      exfiltration). The true link is the agent's H2 -> the child's H4,
+      across processes as the lookalike's false app H2 -> agent H4 is.
+      Ancestry holds from the helper to both, so the correlator can confirm
+      helper D1 -> H4 and D1 -> D1; those pairs carry no truth link (as in
+      the lookalike). The tactic weight ranks the forward D1 links above
+      the unmapped true link and drops it from the K path slots; without it
+      the tight true link is kept (test_orch_groups). The agent never uses
+      the token (no D2, no API request), so the helper's reads are not
+      part of the attack. Known limit: the PRESENT D1 -> H4 (lookalike) is
+      same-process and the unlabelled one here crosses two generations.
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        benign: true
+        incident: helper_job
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-push
+          argv: [/app/metrics-push]
+        outcome: success
+        expects: []
+      - step: 2
+        action: read_token_file
+        benign: true
+        incident: helper_job
+        params:
+          reader_process: "@step1.process"
+          reader_executable: /app/metrics-push
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers (a benign helper, a real D1 finding)"
+      - step: 3
+        action: read_token_file
+        benign: true
+        incident: helper_job
+        after: {step: 2, gap_s: [7, 12]}
+        params:
+          reader_process: "@step1.process"
+          reader_executable: /app/metrics-push
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "The helper reads the token again (a refresh): a real D1 finding, not part of the chain"
+      - step: 4
+        action: process_exec
+        after: {step: 3, gap_s: [6, 12]}
+        params:
+          parent_process: "@step1.process"
+          executable: /tmp/.cache/agent
+          argv: [/tmp/.cache/agent]
+        outcome: success
+        expects: []
+      - step: 5
+        action: connect_external
+        after: {step: 4, gap_s: [0.2, 1]}
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 198.51.100.87      # the lookalike's benign telemetry IP: the IP gives no label away
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The agent connects to a C2 server new to the workload"
+      - step: 6
+        action: process_exec
+        after: {step: 5, gap_s: [0.2, 1]}
+        params:
+          parent_process: "@step4.process"
+          executable: /tmp/.cache/agent
+          argv: [/tmp/.cache/agent, up]
+        outcome: success
+        expects: []
+      - step: 7
+        action: read_sensitive_file
+        after: {step: 6, gap_s: [0.2, 1]}
+        params:
+          reader_process: "@step6.process"
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects:
+          - finding: H4
+            state: UNOBSERVABLE
+            reason: "Read alone without outbound connect"
+      - step: 8
+        action: connect_external
+        after: {step: 7, gap_s: [0.1, 0.5]}
+        params:
+          source_pod: compromised_pod
+          source_process: "@step6.process"
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []          # a destination in the workload's H2 set
+      - step: 9
+        action: egress_transfer
+        after: {step: 8, gap_s: [0.1, 0.5]}
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: "@step6.process"
+          destination: 203.0.113.10
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+    links:
+      - from: 5
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "ancestry: the agent that connected to its C2 server spawned the process that exfiltrates"
+    variants:
+      - id: v1
+        rulebook_shaped: false

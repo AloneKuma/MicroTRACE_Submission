@@ -1,0 +1,73 @@
+# MicroTRACE audit provider coverage record, template v0.
+#
+# Fill one copy per evaluated cluster. Leave a value null until it has been
+# observed on that cluster; do not copy documentation defaults into
+# `observed` fields. Source notes are documentation facts to be re-checked
+# against the provider's current pages at run time.
+record_version: provider-coverage.v0
+cluster_ref: null            # identifier from the cluster collaborator's record
+kubernetes_version: null     # exact server version; floor is 1.32
+control_plane: null          # self-managed | eks | gke | aks | other
+
+effective_policy:
+  source: null               # self-managed: sha256 of audit-policy file; managed: provider page/version
+  self_managed_policy_file_sha256: null
+  provider_policy_reference: null
+  observed_levels_for_required_requests: null   # list of {verb, resource, subresource, level_seen}
+
+backend:
+  kind: null                 # log | webhook | provider-export
+  api_server_mode: null      # blocking | blocking-strict | batch | provider-managed
+  truncation_enabled: null
+  truncation_max_event_bytes: null
+  truncation_max_batch_bytes: null
+  log_rotation: {maxsize_mb: null, maxbackup: null, maxage_days: null}
+  webhook_buffer: {buffer_size: null, batch_max_size: null, batch_max_wait: null}
+
+collector:
+  route: null                # log-file-tail | webhook | provider-export
+  export_destination: null   # e.g. CloudWatch Logs group, Cloud Logging sink, Log Analytics table
+  delivery_indicators: []    # counters or APIs used to establish delivery
+
+provider_notes:
+  eks:
+    doc_fact: >-
+      EKS publishes its audit policy and sends audit logs to CloudWatch Logs.
+      CloudWatch entries above 1 MB are truncated or reduced to request
+      metadata, which can remove an RBAC mutation body even when kube-apiserver
+      truncation is off.
+    control_plane_log_types_enabled: null   # must include "audit"
+    oversized_rbac_mutation_observed: null  # AUD-TRUNCATION-OVERSIZE result
+  gke:
+    doc_fact: >-
+      GKE writes Kubernetes audit entries to the Admin Activity log (writes)
+      and the Data Access log (reads such as get/list). Data Access entries
+      depend on the project's audit log configuration.
+    data_access_types_enabled: null   # subset of ADMIN_READ, DATA_READ, DATA_WRITE
+    read_events_observed: null        # AUD-PROVIDER-READS result
+  aks:
+    doc_fact: >-
+      AKS diagnostic settings expose kube-audit and kube-audit-admin; the
+      kube-audit-admin category excludes get and list events.
+    categories_enabled: null          # kube-audit and/or kube-audit-admin
+    read_events_observed: null        # AUD-PROVIDER-READS result
+
+field_preservation:            # AUD-FIELDS-* results through the actual export
+  audit_id_and_stage: null
+  request_received_and_stage_timestamps: null
+  user_extra_credential_id: null      # authentication.kubernetes.io/credential-id
+  user_extra_pod_uid: null            # authentication.kubernetes.io/pod-uid
+  issued_credential_id_annotation: null
+  response_status: null
+  rbac_request_response_objects: null
+  failed_authentication_events: null  # 401 at ResponseStarted
+
+derived_support:               # computed from the fields above
+  B1: null                     # supported | incomplete | unsupported
+  B2: null
+  B3: null
+  D2: null
+  F2: null
+  G1b: null
+  G2: null
+  H3: null

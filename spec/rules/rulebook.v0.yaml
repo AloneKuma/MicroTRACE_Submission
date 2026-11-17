@@ -1,0 +1,785 @@
+# MicroTRACE per-finding rulebook, version rulebook.v0
+#
+# Status: DESIGN. Every threshold is a named symbol; numeric values are
+# chosen from pilot data (Gap 3) and recorded in parameter-register.md.
+# `status: conditional` marks the dagger types of Table I in paper/D3_v3.tex
+# (D2, E3, F2, G1b).
+# Field paths are Protobuf full names checked against the compiled schema.
+# Witness `key_origin` labels each join-key component `sensor`, `workload`, or
+# `gateway-minted` (sensor only when GatewayObservation.request_id_origin is
+# SENSOR). A direct witness needs at least one sensor or gateway-minted component.
+# `family` names a node capture-manifest family; `gap2` names tests in
+# gap2-tests.yaml. `state.kind`: stateless | keyed | global.
+# `ml` (B1, B2, B3, G1a, H1): the Isolation Forest path. One versioned model
+# artifact per agent holds one forest per type, scored per key and tumbling
+# window; the type fires when its predicate holds OR the score reaches the
+# threshold, and the finding records the path (design-spec, "ML-assisted
+# detection"). `gate` (conditional types): while the gate is off the rule
+# abstains with CONDITIONAL_JOIN_UNVALIDATED.
+#
+# Common abstention for every rule: a required field absent, a Completeness
+# gap overlapping the rule's window on a required input (DROPPED_BEFORE,
+# TRUNCATED, SOURCE_IDLE, POLICY_EXCLUDED, DELIVERY_UNKNOWN), or an unknown
+# enum value means "no finding", and the abstention is counted per rule.
+# Silence is never a negative observation.
+rulebook_version: rulebook.v0
+
+common_emits: [finding_id, finding_type, agent_id, action_id, event_start, event_end,
+               primary_tactic, entities, input_event_ids, detector_version,
+               baseline_version, artifact_versions, evidence_refs, completeness,
+               parameter_set_version]
+
+findings:
+  # ------------------------------------------------------------------ A
+  - id: A1
+    name: injection-pattern
+    agent: A
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.GatewayObservation.request_id, source: gateway, gap2: [GW-STREAMED-SPLIT]}
+      - {field: microtrace.v0.GatewayObservation.path, source: gateway, gap2: [GW-STREAMED-SPLIT]}
+      - {field: microtrace.v0.GatewayObservation.matches, source: gateway, gap2: [GW-STREAMED-SPLIT]}
+      - {field: microtrace.v0.PatternMatch.pattern_id, source: gateway, gap2: [GW-STREAMED-SPLIT]}
+      - {field: microtrace.v0.PatternMatch.location, source: gateway, gap2: [GW-STREAMED-SPLIT]}
+      - {field: microtrace.v0.GatewayObservation.body_truncated, source: gateway, gap2: [GW-OVERSIZE-SLOW-OBSERVER]}
+      - {field: microtrace.v0.GatewayObservation.observer_loss, source: gateway, gap2: [GW-OVERSIZE-SLOW-OBSERVER]}
+    context_joins: []
+    state: {kind: stateless, key: [REQUEST_ID]}
+    parameters: [P_A]
+    predicate: At least one PatternMatch from pattern set P_A in path, query, or observed request body within the declared chunk lookback.
+    evidence_threshold: Attempt only; no claim that the handler was reached or affected.
+    weaker_output: none
+    abstain: [Body pattern class requested but body_truncated or observer_loss set for the covering chunks (path/query matches still emit).]
+    emits: [pattern_id, match_location, pattern_set_version, body_truncated]
+    negative_controls: [Benign request containing the pattern's tokens inside a JSON string field that the pattern set excludes.]
+    gap2: [GW-STREAMED-SPLIT, GW-OVERSIZE-SLOW-OBSERVER]
+
+  - id: A2
+    name: injection-success-indicator
+    agent: A
+    primary_tactic: INITIAL_ACCESS
+    status: specified
+    inputs:
+      - {field: microtrace.v0.GatewayObservation.request_id, source: gateway, gap2: [GW-RESPONSE-INDICATOR]}
+      - {field: microtrace.v0.GatewayObservation.response_status, source: gateway, gap2: [GW-RESPONSE-INDICATOR]}
+      - {field: microtrace.v0.GatewayObservation.response_body_bytes, source: gateway, gap2: [GW-RESPONSE-INDICATOR]}
+      - {field: microtrace.v0.GatewayObservation.response_indicators, source: gateway, gap2: [GW-RESPONSE-INDICATOR]}
+      - {field: microtrace.v0.ResponseIndicator.indicator_id, source: gateway, gap2: [GW-RESPONSE-INDICATOR]}
+    context_joins: []
+    state: {kind: stateless, key: [REQUEST_ID]}
+    parameters: [P_A, I_A2]
+    predicate: A1 holds for request_id AND the same request's response matches an indicator in I_A2 declared for that pattern class.
+    evidence_threshold: The handler acted on the request; compromise itself is not assumed.
+    weaker_output: A1 when the response indicator is absent or unobserved.
+    abstain: [Response not observed (observer_loss) - emit A1 only.]
+    emits: [pattern_id, indicator_id, response_status]
+    negative_controls: [Same pattern with a generic 4xx/5xx error page that is not a declared indicator.]
+    gap2: [GW-RESPONSE-INDICATOR]
+
+  # ------------------------------------------------------------------ B
+  - id: B1
+    name: resource-enumeration
+    agent: B
+    primary_tactic: DISCOVERY
+    status: specified
+    inputs:
+      - {field: microtrace.v0.AuditEvent.verb, source: audit, gap2: [AUD-POLICY-EFFECTIVE, AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.ObjectRef.resource, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.ObjectRef.api_group, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.ObjectRef.namespace, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.AuditEvent.stage_timestamp, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.AuditDerived.principal, source: normalizer, gap2: [AUD-POLICY-EFFECTIVE]}
+    audit_requirements:
+      - {verbs: [get, list, watch], group: "", resource: pods, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [list], group: apps, resource: deployments, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [list], group: rbac.authorization.k8s.io, resource: clusterroles, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+    context_joins: []
+    state: {kind: keyed, key: [PRINCIPAL_KIND, PRINCIPAL_ID], window: W_B1}
+    parameters: [S_B1, W_B1, Q_B1, gamma_B1, N_cold]
+    ml: {model: IF_B, key: [PRINCIPAL_KIND, PRINCIPAL_ID], window: W_B1, threshold: gamma_B1, features: [distinct_resource_count, read_request_count, distinct_namespace_count, list_watch_fraction], cold_start: N_cold, combination: OR}
+    predicate: For one principal, S_B1 (distinct (api_group, resource, namespace) with a successful get/list/watch in W_B1) exceeds Q_B1 from the frozen per-principal baseline.
+    evidence_threshold: Kubernetes API resource enumeration relative to the principal's frozen baseline; not arbitrary HTTP-path diversity.
+    weaker_output: none
+    abstain: ["Principal absent from the frozen baseline (reported as unbaselined, no finding)", "Selected feed lacks read events (AUD-PROVIDER-READS)."]
+    emits: [principal, distinct_resource_count, window_param]
+    negative_controls: [A controller or kubectl get all by the same principal within its baseline; a new principal with no baseline.]
+    gap2: [AUD-POLICY-EFFECTIVE, AUD-PROVIDER-READS]
+
+  - id: B2
+    name: auth-failure-burst
+    agent: B
+    primary_tactic: CREDENTIAL_ACCESS
+    status: specified
+    inputs:
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditEvent.stage, source: audit, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditEvent.source_ips, source: audit, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditEvent.user_agent, source: audit, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditEvent.request_received_timestamp, source: audit, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditDerived.authentication_failed, source: normalizer, gap2: [AUD-FAILED-AUTHN]}
+      - {field: microtrace.v0.AuditDerived.observed_source, source: normalizer, gap2: [AUD-FAILED-AUTHN]}
+    audit_requirements:
+      - {verbs: [get], group: "", resource: pods, subresource: "", min_level: Metadata, stages: [ResponseStarted], authenticated: false}
+      - {verbs: [get], group: "", resource: "", subresource: "", non_resource_url: /api, min_level: Metadata, stages: [ResponseStarted], authenticated: false}
+    context_joins: []
+    state: {kind: keyed, key: [OBSERVED_SOURCE], window: W_B2}
+    parameters: [W_B2, N_B2, gamma_B2]
+    ml: {model: IF_B, key: [OBSERVED_SOURCE], window: W_B2, threshold: gamma_B2, features: [unauthorized_401_count, forbidden_403_count, distinct_user_agent_count, request_count], cold_start: none, combination: OR}
+    predicate: Count of 401 authentication failures from one observed source in W_B2 exceeds N_B2. 403 and other 4xx are counted separately and never contribute.
+    evidence_threshold: Concentrated authentication failures from one observed source. The source is the TCP peer and may be a NAT address, so the entity is UNAUTHENTICATED_SOURCE with STRENGTH_CONTEXT.
+    weaker_output: none
+    abstain: [No 401 events in the selected feed (AUD-FAILED-AUTHN failed).]
+    emits: [observed_source, failure_count, forbidden_count_separate]
+    negative_controls: [A burst of 403 authorization denials; expired-token retries by a single client below N_B2.]
+    gap2: [AUD-FAILED-AUTHN]
+
+  - id: B3
+    name: request-rate-spike
+    agent: B
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.AuditEvent.request_received_timestamp, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+      - {field: microtrace.v0.AuditDerived.principal, source: normalizer, gap2: [AUD-POLICY-EFFECTIVE]}
+    audit_requirements:
+      - {verbs: [get], group: "", resource: configmaps, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+    context_joins: []
+    state: {kind: keyed, key: [PRINCIPAL_KIND, PRINCIPAL_ID], window: W_B3}
+    parameters: [W_B3, Q_B3, gamma_B3, N_cold]
+    ml: {model: IF_B, key: [PRINCIPAL_KIND, PRINCIPAL_ID], window: W_B3, threshold: gamma_B3, features: [request_count, distinct_verb_count, mutating_request_fraction], cold_start: N_cold, combination: OR}
+    predicate: Request count by one principal in W_B3 exceeds Q_B3 from the frozen per-principal baseline.
+    evidence_threshold: Rate alone; no impact or degradation is claimed.
+    weaker_output: none
+    abstain: [Principal not in baseline.]
+    emits: [principal, request_count]
+    negative_controls: [Scheduled benign batch job within its baseline.]
+    gap2: [AUD-POLICY-EFFECTIVE]
+
+  # ------------------------------------------------------------------ C
+  - id: C1a
+    name: escape-indicators
+    agent: C
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.NamespaceDetail.op, source: ebpf, family: ns.change, any_of: escape-primitive, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.NamespaceDetail.clone_flags, source: ebpf, family: ns.change, any_of: escape-primitive, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.PrivilegeDetail.after, source: ebpf, family: priv.creds, any_of: escape-primitive, gap2: [NODE-PRIV-TRANSITION]}
+      - {field: microtrace.v0.Endpoint.unix_path, source: ebpf, family: ipc.runtime_socket, any_of: escape-primitive, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.BpfDetail.cmd, source: ebpf, family: bpf.call, any_of: escape-primitive, gap2: [NODE-BPF-SELF-EXCLUSION]}
+      - {field: microtrace.v0.BpfDetail.caller_is_sensor, source: ebpf, family: bpf.call, any_of: escape-primitive, gap2: [NODE-BPF-SELF-EXCLUSION]}
+      - {field: microtrace.v0.EbpfDerived.pod_uid, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+    context_joins: [cgroup/container -> Pod UID (time-indexed)]
+    state: {kind: stateless, key: [LINEAGE_ID]}
+    parameters: [Z_C]
+    predicate: A Pod-attributed process calls setns/unshare/mount, gains capabilities through capset, connects to a runtime socket in Z_C, or calls bpf() with caller_is_sensor false. Attempts count whatever the result.
+    evidence_threshold: Possible escape attempt; the process is not claimed to have escaped.
+    weaker_output: none
+    abstain: [Pod attribution uncertain for the lineage.]
+    emits: [indicator_kind, result, lineage_id]
+    negative_controls: [The MicroTRACE sensor's own bpf() calls; container runtime's own setns during container start (not Pod-attributed).]
+    gap2: [NODE-NS-TRANSITION, NODE-BPF-SELF-EXCLUSION]
+
+  - id: C1b
+    name: observed-escape
+    agent: C
+    primary_tactic: PRIVILEGE_ESCALATION
+    status: specified
+    inputs:
+      - {field: microtrace.v0.NamespaceDetail.after, source: ebpf, family: ns.change, any_of: host-namespace-state, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.NamespaceDetail.host_reference, source: ebpf, family: ns.sample, any_of: host-namespace-state, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.EbpfDerived.host_namespace_after, source: normalizer, gap2: [NODE-NS-TRANSITION]}
+      - {field: microtrace.v0.ExecDetail.executable, source: ebpf, family: proc.exec, gap2: [NODE-EXEC-LINEAGE]}
+      - {field: microtrace.v0.RawEbpfRecord.lineage_root, source: ebpf, family: proc.fork, gap2: [NODE-EXEC-LINEAGE]}
+    context_joins: [lineage root -> Pod UID]
+    state: {kind: stateless, key: [LINEAGE_ID]}
+    parameters: []
+    predicate: A process whose lineage root is Pod-attributed has mnt and pid namespaces equal to host_reference after a transition or at exec, or performs a host-level exec outside its container cgroup, while lineage continuity to the container is observed.
+    evidence_threshold: Observed transition into host namespaces or host-level effect tied to the originating container lineage.
+    weaker_output: C1a when only the attempt is observed.
+    abstain: [Lineage gap (fork/exec events dropped) between the container process and the host-namespace process.]
+    emits: [lineage_id, namespaces_equal_host, via_operation]
+    negative_controls: ["A privileged DaemonSet that legitimately runs in host namespaces from start (declared, no transition from a non-host lineage)."]
+    gap2: [NODE-NS-TRANSITION, NODE-EXEC-LINEAGE]
+
+  - id: C2
+    name: ptrace-observed
+    agent: C
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.PtraceDetail.request, source: ebpf, family: proc.ptrace, gap2: [NODE-PTRACE]}
+      - {field: microtrace.v0.PtraceDetail.target, source: ebpf, family: proc.ptrace, gap2: [NODE-PTRACE]}
+    context_joins: [cgroup/container -> Pod UID]
+    state: {kind: stateless, key: [LINEAGE_ID]}
+    parameters: []
+    predicate: A Pod-attributed process issues a ptrace attach/seize request.
+    evidence_threshold: ptrace observed; injection or intent is not established.
+    weaker_output: none
+    abstain: []
+    emits: [ptrace_request, target_process]
+    negative_controls: [Reading /proc/<pid>/status (no ptrace request).]
+    gap2: [NODE-PTRACE]
+
+  # ------------------------------------------------------------------ D
+  - id: D1
+    name: token-read-anomaly
+    agent: D
+    primary_tactic: CREDENTIAL_ACCESS
+    status: specified
+    inputs:
+      - {field: microtrace.v0.FileAccessDetail.op, source: ebpf, family: file.read, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.FileAccessDetail.bytes, source: ebpf, family: file.read, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.FileIdentity.dev, source: ebpf, family: file.open, gap2: [NODE-TOKEN-FILE-IDENTITY]}
+      - {field: microtrace.v0.FileIdentity.ino, source: ebpf, family: file.open, gap2: [NODE-TOKEN-FILE-IDENTITY]}
+      - {field: microtrace.v0.FileIdentity.mnt_ns_inum, source: ebpf, family: file.open, gap2: [NODE-TOKEN-FILE-IDENTITY]}
+      - {field: microtrace.v0.FileIdentity.projected, source: ebpf, family: file.read, gap2: [NODE-TOKEN-ROTATION]}
+      - {field: microtrace.v0.ProjectedVersion.owner_pod_uid, source: ebpf, family: token.file_index, gap2: [NODE-TOKEN-FILE-IDENTITY]}
+      - {field: microtrace.v0.ProjectedVersion.version_dir, source: ebpf, family: token.file_index, gap2: [NODE-TOKEN-ROTATION]}
+      - {field: microtrace.v0.RawEbpfRecord.reader_class, source: ebpf, family: file.read, gap2: [NODE-HOST-READER]}
+      - {field: microtrace.v0.RawEbpfRecord.result, source: ebpf, family: file.read, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.EbpfDerived.token_file, source: normalizer, gap2: [NODE-TOKEN-FILE-IDENTITY]}
+      - {field: microtrace.v0.EbpfDerived.pod_uid, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+    context_joins: ["(dev, ino) -> projected token version via token.file_index", "reader cgroup -> Pod UID", "token owner Pod UID -> workload identity"]
+    state: {kind: keyed, key: [POD_UID, VOLUME_NAME], window: null}
+    parameters: [E_D1]
+    predicate: >-
+      A file.read with result SUCCESS and bytes > 0 whose (dev, ino) resolves
+      to a projected ServiceAccount token version, by a reader (Pod process or
+      host process) that is not in the frozen expected-reader artifact E_D1
+      for the token owner's workload.
+    evidence_threshold: >-
+      Successful read of a resolved token file by an unexpected process, with
+      reader attribution kept separate from the token owner. A host reader is
+      reported as HOST_PROCESS and is not assigned to the owning Pod. Theft or
+      later use is not established.
+    weaker_output: none
+    abstain: ["(dev, ino) not in the index", "Open without a successful read", "Reader cgroup unresolved (JOIN_UNCERTAIN)", "Token owner workload not in E_D1."]
+    emits: [token_owner_pod_uid, token_version_dir, reader_class, reader_process, reader_pod_uid]
+    negative_controls: ["The workload's own client library reading its token (in E_D1)", "An open with O_RDONLY that is never read", "A file at the same path text in another mount namespace with different (dev, ino)", "kubelet writing a new version during rotation."]
+    gap2: [NODE-FILE-READ-SUCCESS, NODE-TOKEN-FILE-IDENTITY, NODE-TOKEN-ROTATION, NODE-HOST-READER]
+
+  - id: D2
+    name: token-binding-mismatch
+    agent: D
+    primary_tactic: null
+    status: conditional
+    inputs:
+      - {field: microtrace.v0.AuditUser.extra, source: audit, extra_keys: ["authentication.kubernetes.io/pod-uid", "authentication.kubernetes.io/pod-name"], gap2: [AUD-POD-BINDING-EXTRA]}
+      - {field: microtrace.v0.AuditDerived.bound_pod_uid, source: normalizer, gap2: [AUD-POD-BINDING-EXTRA]}
+      - {field: microtrace.v0.AuditDerived.attributed_caller_pod_uid, source: normalizer, gap2: [CRED-CALLER-ATTRIBUTION]}
+      - {field: microtrace.v0.AuditDerived.peer_caller_pod_uid, source: normalizer, gap2: [CRED-CALLER-ATTRIBUTION]}
+      - {field: microtrace.v0.AuditEvent.source_ips, source: audit, gap2: [CRED-CALLER-ATTRIBUTION]}
+      - {field: microtrace.v0.SocketDetail.remote, source: ebpf, family: net.connect, gap2: [CRED-CALLER-ATTRIBUTION]}
+      - {field: microtrace.v0.AuditEvent.audit_id, source: audit, gap2: [AUD-POLICY-EFFECTIVE]}
+    audit_requirements:
+      - {verbs: [get, list], group: "", resource: secrets, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [create], group: "", resource: pods, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [get, create], group: "", resource: pods, subresource: exec, min_level: Metadata, stages: [ResponseStarted], authenticated: true}
+      - {verbs: [create, update, patch], group: rbac.authorization.k8s.io, resource: rolebindings, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [create, update, patch], group: rbac.authorization.k8s.io, resource: clusterrolebindings, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+    context_joins: [bound Pod UID -> Pod history, caller Pod from an eBPF connection to the API server from the request's peer address open at request time (conditional), caller Pod from the last source_ips entry -> time-indexed Pod IP history (conditional)]
+    state: {kind: stateless, key: [JTI]}
+    parameters: [G_D2]
+    gate: G_D2
+    predicate: >-
+      For one audited request of any verb, bound_pod_uid (validated Pod binding)
+      is present, attributed_caller_pod_uid (eBPF connection open at request
+      time) and peer_caller_pod_uid (last source_ips entry through the Pod IP
+      history) are both present and equal, and that caller differs from
+      bound_pod_uid. Only the last source_ips entry is used; earlier entries
+      are client-supplied. unverified_node_name / unverified_node_uid are never
+      used to place the caller.
+    evidence_threshold: A binding mismatch for one request; not theft (a bound token can be legitimately requested outside X), not lateral movement. Scored against binding-mismatch ground truth, not attack ground truth.
+    weaker_output: none
+    abstain: [Either caller route absent or ambiguous, The two caller routes disagree, Peer address is a node or host-network address (shared by every host-network process), No connection from the peer address covers the request time (e.g. opened before the sensor and missing from the start-up socket snapshot), Token not Pod-bound (legacy Secret token or TokenRequest without a Pod binding).]
+    emits: [bound_pod_uid, caller_pod_uid, audit_id]
+    negative_controls: [Stay-in-X use of X's own token (D2 must not fire), A request whose only caller evidence is the unverified node-name claim, A request with a forged X-Forwarded-For header naming another Pod (only the last source_ips entry may be used), A request from a host-network Pod (D2 must abstain), An authorised component in Pod Z legitimately using a TokenRequest token bound to X (D2 fires; labelled benign binding mismatch in ground truth).]
+    gap2: [AUD-POD-BINDING-EXTRA, CRED-CALLER-ATTRIBUTION]
+
+  # ------------------------------------------------------------------ E
+  - id: E1
+    name: unsigned-image-admitted
+    agent: E
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.AdmissionDecision.verdict, source: kyverno, gap2: [KYV-POD-UID-DRYRUN]}
+      - {field: microtrace.v0.AdmissionDecision.enforcement_audit_mode, source: kyverno, gap2: [KYV-POD-UID-DRYRUN]}
+      - {field: microtrace.v0.AdmissionDecision.resource_uid, source: kyverno, gap2: [KYV-POD-UID-DRYRUN]}
+      - {field: microtrace.v0.AdmissionDecision.dry_run, source: kyverno, gap2: [KYV-POD-UID-DRYRUN]}
+      - {field: microtrace.v0.AdmissionDecision.image_digests, source: kyverno, gap2: [KYV-POD-UID-DRYRUN]}
+      - {field: microtrace.v0.AdmissionDecision.admission_time, source: kyverno, gap2: [KYV-ADMISSION-TIME]}
+    context_joins: [resource_uid -> Pod history (created Pod exists)]
+    state: {kind: stateless, key: [POD_UID, CONTAINER_NAME]}
+    parameters: []
+    predicate: Verdict FAIL under an audit-mode (non-blocking) image-signature/pinning policy for a created Pod, not dry-run.
+    evidence_threshold: Policy violation on an admitted Pod; not adversary behavior.
+    weaker_output: none (decided 2026-10-08; agent.E.v0 is keyed by Pod UID, so an admission without one is not routed and the restreamer records a JOIN_UNCERTAIN gap instead)
+    abstain: [dry_run true, resource_uid never observed as an existing Pod (generateName retry) - evidence gap.]
+    emits: [policy, rule, image_digest, pod_uid_join_status]
+    negative_controls: [Dry-run create, A PASS verdict, A blocking (enforce) policy that rejected the Pod.]
+    gap2: [KYV-POD-UID-DRYRUN, KYV-ADMISSION-TIME]
+
+  - id: E2
+    name: post-start-binary-write
+    agent: E
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.FileMutationDetail.op, source: ebpf, family: file.mutation, gap2: [NODE-EXEC-WRITE-VARIANTS]}
+      - {field: microtrace.v0.FileMutationDetail.file, source: ebpf, family: file.mutation, gap2: [NODE-EXEC-WRITE-VARIANTS]}
+      - {field: microtrace.v0.FileMutationDetail.executable_after, source: ebpf, family: file.mutation, gap2: [NODE-EXEC-WRITE-VARIANTS]}
+      - {field: microtrace.v0.EbpfDerived.pod_uid, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+      - {field: microtrace.v0.EbpfDerived.container_name, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+      - {field: microtrace.v0.ContainerStatusSummary.started_at, source: context, gap2: [CTX-RESTART-INDICATOR]}
+    context_joins: [cgroup/container -> Pod UID and container name, container start from context]
+    state: {kind: stateless, key: [POD_UID, CONTAINER_NAME]}
+    parameters: [E_E2]
+    predicate: After the container started, a process not in the frozen expected-writer artifact E_E2 writes, creates, renames, or chmods a file so that it is executable, or writes into a declared package-manager path.
+    evidence_threshold: Unexpected executable or package write; durability and later execution are not inferred.
+    weaker_output: none
+    abstain: ["Write observed only through a shared mmap (content unknown) - JOIN_UNCERTAIN, no finding."]
+    emits: [file_identity, mutation_op, writer_process]
+    negative_controls: [Writes of non-executable data files, Declared entrypoint setup writes in E_E2.]
+    gap2: [NODE-EXEC-WRITE-VARIANTS]
+
+  - id: E3
+    name: persisted-implant
+    agent: E
+    primary_tactic: PERSISTENCE
+    status: conditional
+    inputs:
+      - {field: microtrace.v0.FileMutationDetail.file, source: ebpf, family: file.mutation, gap2: [E3-ARTIFACT-IDENTITY]}
+      - {field: microtrace.v0.ExecDetail.executable, source: ebpf, family: proc.exec, gap2: [E3-REEXEC-RESTART]}
+      - {field: microtrace.v0.ContainerRef.container_id, source: ebpf, family: proc.exec, gap2: [CTX-RESTART-INDICATOR]}
+      - {field: microtrace.v0.ContainerStatusSummary.restart_count, source: context, gap2: [CTX-RESTART-INDICATOR]}
+      - {field: microtrace.v0.ContainerStatusSummary.container_id, source: context, gap2: [CTX-RESTART-INDICATOR]}
+      - {field: microtrace.v0.RawEbpfRecord.node_seq, source: ebpf, family: proc.exec, gap2: [KAFKA-RESTREAM-ORDER]}
+    context_joins: [same Pod UID, container name stable, container ID changed or restart count increased]
+    state: {kind: keyed, key: [POD_UID, CONTAINER_NAME], window: W_E}
+    parameters: [W_E, G_E3]
+    gate: G_E3
+    artifact_identity: mount-dev-ino-with-write-tracking
+    predicate: >-
+      Within W_E: an E2-qualifying write to a file on a mounted volume, then a
+      same-Pod container restart, then execution of an artifact with the same
+      identity under the selected (not yet chosen) artifact-identity method, by
+      existing workload behavior, all ordered by node_seq.
+    evidence_threshold: Observed re-execution after restart. File survival alone is insufficient.
+    weaker_output: E2 (unmapped) when re-execution, restart, or artifact identity is not observed.
+    abstain: ["Artifact-identity method not demonstrated (always, until E3-ARTIFACT-IDENTITY passes)", "Any dropped interval between write and exec."]
+    emits: [artifact_identity, write_event, reexec_event, restart_evidence]
+    negative_controls: [Benign restart with no write, A matching artifact in a concurrent replica (different Pod UID), A written file never executed after restart.]
+    gap2: [E3-ARTIFACT-IDENTITY, E3-REEXEC-RESTART, CTX-RESTART-INDICATOR, NODE-EXEC-WRITE-VARIANTS]
+
+  # ------------------------------------------------------------------ F
+  - id: F1
+    name: capability-gain
+    agent: F
+    primary_tactic: PRIVILEGE_ESCALATION
+    status: specified
+    inputs:
+      - {field: microtrace.v0.PrivilegeDetail.before, source: ebpf, family: priv.creds, gap2: [NODE-PRIV-TRANSITION]}
+      - {field: microtrace.v0.PrivilegeDetail.after, source: ebpf, family: priv.creds, gap2: [NODE-PRIV-TRANSITION]}
+      - {field: microtrace.v0.PrivilegeDetail.via_executable, source: ebpf, family: priv.creds, gap2: [NODE-PRIV-TRANSITION]}
+      - {field: microtrace.v0.Creds.euid, source: ebpf, family: priv.creds, gap2: [NODE-PRIV-TRANSITION]}
+      - {field: microtrace.v0.Creds.cap_effective, source: ebpf, family: priv.creds, gap2: [NODE-PRIV-TRANSITION]}
+    context_joins: [cgroup/container -> Pod UID]
+    state: {kind: stateless, key: [LINEAGE_ID]}
+    parameters: [E_F1]
+    predicate: A Pod-attributed process moves from euid != 0 to euid == 0, or gains effective capabilities not held before, and the transition is not in the frozen expected-transition artifact E_F1.
+    evidence_threshold: Observed unauthorized capability or effective-identity gain.
+    weaker_output: none
+    abstain: [Before-state unknown.]
+    emits: [before_creds, after_creds, via_executable]
+    negative_controls: [A declared setuid helper in E_F1, Capability drop.]
+    gap2: [NODE-PRIV-TRANSITION]
+
+  - id: F2
+    name: RBAC-grant-mutation
+    agent: F
+    primary_tactic: PRIVILEGE_ESCALATION
+    status: conditional
+    inputs:
+      - {field: microtrace.v0.AuditEvent.verb, source: audit, gap2: [AUD-RBAC-BODY]}
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [AUD-RBAC-BODY]}
+      - {field: microtrace.v0.ObjectRef.uid, source: audit, gap2: [CTX-RBAC-RECREATE]}
+      - {field: microtrace.v0.ObjectRef.resource_version, source: audit, gap2: [AUD-RBAC-BODY]}
+      - {field: microtrace.v0.AuditEvent.request_object, source: audit, gap2: [AUD-RBAC-BODY, AUD-TRUNCATION-OVERSIZE]}
+      - {field: microtrace.v0.AuditEvent.response_object, source: audit, gap2: [AUD-RBAC-BODY, AUD-TRUNCATION-OVERSIZE]}
+      - {field: microtrace.v0.AuditUser.groups, source: audit, gap2: [F2-HISTORICAL-RIGHTS]}
+      - {field: microtrace.v0.AuditEvent.impersonated_user, source: audit, gap2: [F2-HISTORICAL-RIGHTS]}
+      - {field: microtrace.v0.RbacSummary.rules, source: context, gap2: [F2-HISTORICAL-RIGHTS]}
+      - {field: microtrace.v0.RbacSummary.subjects, source: context, gap2: [F2-HISTORICAL-RIGHTS]}
+      - {field: microtrace.v0.RbacSummary.aggregation_selectors, source: context, gap2: [F2-HISTORICAL-RIGHTS]}
+      - {field: microtrace.v0.ObjectObservation.watch_stream_seq, source: context, gap2: [CTX-WATCH-410]}
+      - {field: microtrace.v0.WatchGap.reason, source: context, gap2: [CTX-WATCH-410]}
+    audit_requirements:
+      - {verbs: [create, update, patch, delete], group: rbac.authorization.k8s.io, resource: rolebindings, subresource: "", min_level: RequestResponse, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [create, update, patch, delete], group: rbac.authorization.k8s.io, resource: clusterrolebindings, subresource: "", min_level: RequestResponse, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [create, update, patch], group: rbac.authorization.k8s.io, resource: roles, subresource: "", min_level: RequestResponse, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [update, patch], group: rbac.authorization.k8s.io, resource: clusterroles, subresource: "", min_level: RequestResponse, stages: [ResponseComplete], authenticated: true}
+    context_joins: ["replicated time-indexed RBAC history (UID, resourceVersion, watch stream order)", "external group membership source if any"]
+    state: {kind: global, key: [OBJECT_UID], window: null}
+    parameters: [G_F2]
+    gate: G_F2
+    predicate: >-
+      For each subject affected by a successful RBAC mutation, compute the
+      effective RBAC rights immediately before and after the mutation from
+      the complete versioned history, using version-matched Kubernetes
+      subject/role resolution and RuleAllows. Fire when the after-set adds a
+      right absent from the before-set. The before-set counts every additive
+      grant (so redundant grants add nothing), wildcards, aggregated ClusterRole
+      state including controller reconciliation, and system:masters (whose
+      members already hold every right). Rights that an earlier authorizer
+      (Node, webhook) decides before RBAC are noted. An explicit webhook deny
+      preempts an RBAC allow; a no-opinion response does not. Impersonation
+      grants are included.
+    evidence_threshold: >-
+      Successful mutation that adds an effective right the subject lacked
+      immediately before. A mutation or a single matching binding alone is not
+      a new right.
+    weaker_output: none (abstention counted)
+    abstain:
+      - A WatchGap (410 Gone relist, disconnect) covers the interval between the last complete state and the mutation, and no audit body fills it.
+      - Audit body stripped/truncated AND history cannot attribute the transition to this audit action (object UID and resourceVersion in one watch stream).
+      - An externally authenticated group could change the before/after result and its membership history is unavailable.
+      - Authorizer chain configuration for the cluster is unknown.
+    emits: [subject, added_rights, mutation_audit_id, binding_uid, reconstruction_source]
+    negative_controls: [A second binding granting an already-held right, Aggregation-controller reconciliation that adds no new right to the subject, Binding to a subject in system:masters, "Delete-and-recreate with identical content: the delete does not fire, and the recreate is attributed to the new binding UID, never matched to the deleted one."]
+    gap2: [F2-HISTORICAL-RIGHTS, AUD-RBAC-BODY, AUD-TRUNCATION-OVERSIZE, CTX-WATCH-410, CTX-RBAC-RECREATE]
+
+  # ------------------------------------------------------------------ G
+  - id: G1a
+    name: unbaselined-connection
+    agent: G
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.SocketDetail.remote, source: ebpf, family: net.connect, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.SocketDetail.flow, source: ebpf, family: net.connect, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.RawEbpfRecord.result, source: ebpf, family: net.connect, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.EbpfDerived.remote_pod_uid, source: normalizer, gap2: [CTX-POD-IP-REUSE]}
+      - {field: microtrace.v0.EbpfDerived.pod_uid, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+    context_joins: [remote IP -> Pod/Service at event time (interval-correct)]
+    state: {kind: stateless, key: [POD_UID]}
+    parameters: [Q_G1a, gamma_G1a, W_G1a_ml, N_cold]
+    ml: {model: IF_G, key: [POD_UID], window: W_G1a_ml, threshold: gamma_G1a, features: [connect_count, distinct_edge_count, unbaselined_edge_count, distinct_port_count, failed_connect_fraction], cold_start: N_cold, combination: OR}
+    predicate: Successful connect from a workload to an in-cluster endpoint whose (source workload, destination workload, port) edge is absent from the frozen service-edge baseline Q_G1a.
+    evidence_threshold: Connection outside baseline; access gained is unknown.
+    weaker_output: none
+    abstain: [Remote IP ambiguous in the interval (JOIN_UNCERTAIN).]
+    emits: [source_workload, destination_workload, port]
+    negative_controls: [A baselined edge after Pod IP reuse by a different Pod.]
+    gap2: [NODE-SOCKET-FLOW, CTX-POD-IP-REUSE]
+
+  # G1c (exp2-conflict-origin-cases-plan P1, D-27): G1a seen from the receiving
+  # side. The receiver reports an unexpected inbound edge even when the
+  # caller's node is unobserved or compromised. Rule path only (no IF_G model);
+  # evaluated on the pilot-cases add-on set only. The name G1b is taken.
+  - id: G1c
+    name: unbaselined-inbound-connection
+    agent: G
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.SocketDetail.remote, source: ebpf, family: net.accept, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.SocketDetail.local, source: ebpf, family: net.accept, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.SocketDetail.flow, source: ebpf, family: net.accept, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.RawEbpfRecord.result, source: ebpf, family: net.accept, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.EbpfDerived.remote_pod_uid, source: normalizer, gap2: [CTX-POD-IP-REUSE]}
+      - {field: microtrace.v0.EbpfDerived.pod_uid, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+    context_joins: [peer IP -> Pod at event time (interval-correct)]
+    state: {kind: stateless, key: [POD_UID]}
+    parameters: [Q_G1a]
+    predicate: Successful accept in a workload of an in-cluster connection whose (source workload, destination workload, port) edge, with the source resolved from the peer IP and the port the local one, is absent from the frozen service-edge baseline Q_G1a.
+    evidence_threshold: Inbound connection outside baseline; what the caller did is unknown.
+    weaker_output: none
+    abstain: [Peer IP ambiguous in the interval (JOIN_UNCERTAIN).]
+    emits: [source_workload, destination_workload, port]
+    negative_controls: [A baselined edge after Pod IP reuse by a different Pod.]
+    gap2: [NODE-SOCKET-FLOW, CTX-POD-IP-REUSE]
+
+  - id: G1b
+    name: token-pivot
+    agent: G
+    primary_tactic: LATERAL_MOVEMENT
+    status: conditional
+    inputs:
+      - {field: microtrace.v0.TokenFileVersion.jti, source: ebpf, family: token.jti_index, gap2: [CRED-JTI-VERSION-INDEX]}
+      - {field: microtrace.v0.FileIdentity.projected, source: ebpf, family: file.read, gap2: [NODE-TOKEN-ROTATION]}
+      - {field: microtrace.v0.AuditDerived.used_credential_id, source: normalizer, gap2: [AUD-FIELDS-USEDTOKEN]}
+      - {field: microtrace.v0.AuditUser.extra, source: audit, extra_keys: ["authentication.kubernetes.io/credential-id"], gap2: [AUD-FIELDS-USEDTOKEN]}
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [G1B-TARGET-EFFECT]}
+      - {field: microtrace.v0.ObjectRef.namespace, source: audit, gap2: [G1B-TARGET-EFFECT]}
+    audit_requirements:
+      - {verbs: [get], group: "", resource: secrets, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+      - {verbs: [create], group: "", resource: serviceaccounts, subresource: token, min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+    context_joins: ["read (dev, ino, version_dir) -> JTI via token.jti_index", "JTI -> use events", "declared boundary set Bnd_G1b"]
+    state: {kind: keyed, key: [JTI], window: W_w}
+    parameters: [Bnd_G1b, G_G1b]
+    gate: G_G1b
+    predicate: >-
+      credential-read-to-use holds (an observed read of a token version whose
+      JTI equals used_credential_id on a later request) AND that request is a
+      distinct authenticated action with a successful effect across a boundary
+      declared in Bnd_G1b. It must not share an action ID with a G2 exec.
+    evidence_threshold: A distinct authenticated access action with a defined effect at the target; token replay, a binding mismatch, or a connection are each insufficient.
+    weaker_output: none (D1 and the use event remain as evidence)
+    abstain: [Until CRED-JTI-VERSION-INDEX and G1B-TARGET-EFFECT pass, Effect is an exec already represented by G2.]
+    emits: [jti, read_event, use_audit_id, boundary, effect]
+    negative_controls: ["Two tokens for one ServiceAccount (must not join)", "Stay-in-X use (positive attack case for recall, not a negative)."]
+    gap2: [CRED-JTI-VERSION-INDEX, G1B-TARGET-EFFECT, AUD-FIELDS-USEDTOKEN, AUD-ISSUED-ANNOTATION]
+
+  - id: G2
+    name: exec-into-container
+    agent: G
+    primary_tactic: EXECUTION
+    status: specified
+    inputs:
+      - {field: microtrace.v0.ObjectRef.subresource, source: audit, gap2: [AUD-EXEC-VERB]}
+      - {field: microtrace.v0.AuditEvent.verb, source: audit, gap2: [AUD-EXEC-VERB]}
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [AUD-EXEC-VERB]}
+      - {field: microtrace.v0.AuditEvent.request_uri, source: audit, gap2: [G2-TARGET-PROCESS-JOIN]}
+      - {field: microtrace.v0.AuditDerived.resolved_target_pod_uid, source: normalizer, gap2: [G2-TARGET-PROCESS-JOIN]}
+      - {field: microtrace.v0.ExecDetail.starts_new_lineage, source: ebpf, family: proc.exec, gap2: [G2-TARGET-PROCESS-JOIN]}
+      - {field: microtrace.v0.ExecDetail.argv_sha256, source: ebpf, family: proc.exec, gap2: [G2-TARGET-PROCESS-JOIN]}
+    audit_requirements:
+      - {verbs: [get, create], group: "", resource: pods, subresource: exec, min_level: Metadata, stages: [ResponseStarted], authenticated: true}
+    context_joins: [namespace/name -> Pod UID at request time, container name from request_uri]
+    state: {kind: keyed, key: [POD_UID], window: W_G2}
+    parameters: [W_G2]
+    predicate: >-
+      An accepted pods/exec request (upgrade accepted at ResponseStarted) for
+      Pod P and container c, and within W_G2 a new-lineage exec in P/c whose
+      argv hash matches the command in request_uri.
+    evidence_threshold: Accepted exec request joined to the resulting target process; one underlying action (action_id = audit_id). A crossed boundary is an attribute, not a second finding.
+    weaker_output: none (the audit record is evidence only)
+    abstain: [Target Pod UID ambiguous, No matching exec observed in W_G2 (sensor gap or not executed).]
+    emits: [audit_id, target_pod_uid, target_container, target_process, boundary_crossed]
+    negative_controls: [A denied exec (403), Container's own periodic probe exec (no audit request).]
+    gap2: [AUD-EXEC-VERB, G2-TARGET-PROCESS-JOIN]
+
+  # ------------------------------------------------------------------ H
+  - id: H1
+    name: egress-volume-anomaly
+    agent: H
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.FlowCounter.bytes_out, source: ebpf, family: net.flow_bytes, gap2: [NODE-FLOW-COUNTERS]}
+      - {field: microtrace.v0.FlowCounter.remote, source: ebpf, family: net.flow_bytes, gap2: [NODE-FLOW-COUNTERS]}
+      - {field: microtrace.v0.EbpfDerived.remote_class, source: normalizer, gap2: [CTX-POD-IP-REUSE]}
+    context_joins: [flow owner -> Pod UID -> workload]
+    state: {kind: keyed, key: [POD_UID], window: W_H1}
+    parameters: [W_H1, Q_H1, gamma_H1, N_cold]
+    ml: {model: IF_H, key: [POD_UID], window: W_H1, threshold: gamma_H1, features: [external_bytes_out, external_flow_count, distinct_external_destination_count], cold_start: N_cold, combination: OR}
+    predicate: Egress bytes to external destinations for one Pod in W_H1 exceed the frozen percentile baseline Q_H1 of its workload.
+    evidence_threshold: Volume only; content is not known.
+    weaker_output: none
+    abstain: [Counter interval overlaps a sensor loss interval.]
+    emits: [bytes_out, window_param, baseline_quantile]
+    negative_controls: [Scheduled backup within baseline.]
+    gap2: [NODE-FLOW-COUNTERS]
+
+  - id: H2
+    name: unseen-destination
+    agent: H
+    primary_tactic: null
+    status: specified
+    inputs:
+      - {field: microtrace.v0.SocketDetail.remote, source: ebpf, family: net.connect, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.EbpfDerived.remote_class, source: normalizer, gap2: [NODE-SOCKET-FLOW]}
+    context_joins: [flow owner -> Pod UID -> workload]
+    state: {kind: stateless, key: [POD_UID]}
+    parameters: [Q_H2]
+    predicate: Outbound connect to an external destination (IP and port) absent from the workload's frozen destination set Q_H2.
+    evidence_threshold: New destination; legitimacy is not inferred.
+    weaker_output: none
+    abstain: []
+    emits: [destination, port]
+    negative_controls: ["Known destination at a new IP of the same declared range, if the set declares ranges."]
+    gap2: [NODE-SOCKET-FLOW]
+
+  - id: H3
+    name: bulk-secret-enumeration
+    agent: H
+    primary_tactic: CREDENTIAL_ACCESS
+    status: specified
+    inputs:
+      - {field: microtrace.v0.AuditEvent.verb, source: audit, gap2: [AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.ObjectRef.resource, source: audit, gap2: [AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.ObjectRef.namespace, source: audit, gap2: [AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.ObjectRef.name, source: audit, gap2: [AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.AuditEvent.response_code, source: audit, gap2: [AUD-PROVIDER-READS]}
+      - {field: microtrace.v0.AuditDerived.principal, source: normalizer, gap2: [AUD-POLICY-EFFECTIVE]}
+    audit_requirements:
+      - {verbs: [get, list, watch], group: "", resource: secrets, subresource: "", min_level: Metadata, stages: [ResponseComplete], authenticated: true}
+    context_joins: []
+    state: {kind: keyed, key: [PRINCIPAL_KIND, PRINCIPAL_ID], window: W_H3}
+    parameters: [W_H3, N_H3]
+    predicate: >-
+      For one principal in W_H3, successful secret list/watch requests plus
+      distinct secret names read by get exceed N_H3. At Metadata level the
+      number of secrets returned by a list is unknown, so a list counts as
+      one request per namespace scope.
+    evidence_threshold: Repeated secret enumeration; no outbound transfer is implied.
+    weaker_output: none
+    abstain: [Read events absent from the selected feed.]
+    emits: [principal, list_requests, distinct_secret_gets, namespaces]
+    negative_controls: [A controller's periodic list of one namespace below N_H3.]
+    gap2: [AUD-PROVIDER-READS, AUD-POLICY-EFFECTIVE]
+
+  - id: H4
+    name: suspected-exfiltration
+    agent: H
+    primary_tactic: EXFILTRATION
+    status: specified
+    inputs:
+      - {field: microtrace.v0.FileIdentity.ino, source: ebpf, family: file.open, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.FileAccessDetail.bytes, source: ebpf, family: file.read, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.EbpfDerived.data_class, source: normalizer, gap2: [NODE-FILE-READ-SUCCESS]}
+      - {field: microtrace.v0.SocketDetail.remote, source: ebpf, family: net.connect, gap2: [NODE-SOCKET-FLOW]}
+      - {field: microtrace.v0.FlowCounter.bytes_out, source: ebpf, family: net.flow_bytes, gap2: [NODE-FLOW-COUNTERS]}
+      - {field: microtrace.v0.EbpfDerived.lineage_id, source: normalizer, gap2: [NODE-EXEC-LINEAGE]}
+      - {field: microtrace.v0.RawEbpfRecord.node_seq, source: ebpf, family: file.read, gap2: [KAFKA-RESTREAM-ORDER]}
+    context_joins: [file identity -> declared sensitive-data class C_H4]
+    state: {kind: keyed, key: [POD_UID, LINEAGE_ID], window: W_H}
+    parameters: [W_H, C_H4]
+    predicate: >-
+      In one (Pod UID, lineage), a successful read of a file in C_H4 is
+      followed, in node_seq order and within W_H, by an external connect whose
+      flow (owned by the same lineage) carries bytes_out > 0.
+    evidence_threshold: Suspected exfiltration within one process lineage; the bytes sent are not shown to be the bytes read.
+    weaker_output: none
+    abstain: ["node_seq gap in the key's interval", "Read and transfer in different lineages (out of scope, counted as a miss)."]
+    emits: [read_event, transfer_flow, destination, bytes_out]
+    negative_controls: [Read in one lineage and send from another in the same Pod (must not fire), An ordinary outbound transfer with no preceding sensitive read.]
+    gap2: [NODE-FILE-READ-SUCCESS, NODE-SOCKET-FLOW, NODE-FLOW-COUNTERS, KAFKA-RESTREAM-ORDER]
+
+  - id: H5
+    name: offnode-suspected-exfiltration
+    agent: H
+    primary_tactic: EXFILTRATION
+    status: specified
+    inputs:
+      - {field: microtrace.v0.DbAuditRecord.client, source: db-audit, gap2: [OFFNODE-DBAUDIT-SOURCE]}
+      - {field: microtrace.v0.DbAuditRecord.statement_class, source: db-audit, gap2: [OFFNODE-DBAUDIT-SOURCE]}
+      - {field: microtrace.v0.DbAuditRecord.succeeded, source: db-audit, gap2: [OFFNODE-DBAUDIT-SOURCE]}
+      - {field: microtrace.v0.DbAuditRecord.bytes_returned, source: db-audit, gap2: [OFFNODE-DBAUDIT-SOURCE]}
+      - {field: microtrace.v0.DbAuditRecord.server_time, source: db-audit, gap2: [OFFNODE-DBAUDIT-SOURCE]}
+      - {field: microtrace.v0.PathFlowRecord.src, source: path-flow, gap2: [OFFNODE-PATH-COVERAGE]}
+      - {field: microtrace.v0.PathFlowRecord.dst, source: path-flow, gap2: [OFFNODE-PATH-COVERAGE]}
+      - {field: microtrace.v0.PathFlowRecord.octets, source: path-flow, gap2: [OFFNODE-FLOW-EXPORT]}
+      - {field: microtrace.v0.PathFlowRecord.flow_start, source: path-flow, gap2: [OFFNODE-FLOW-EXPORT]}
+      - {field: microtrace.v0.PathFlowRecord.flow_end, source: path-flow, gap2: [OFFNODE-FLOW-EXPORT]}
+      - {field: microtrace.v0.PathFlowRecord.sampled, source: path-flow, gap2: [OFFNODE-FLOW-EXPORT]}
+      - {field: microtrace.v0.OffNodeDerived.source_address_class, source: normalizer, gap2: [CTX-POD-IP-REUSE, OFFNODE-HOST-SIGNATURES]}
+      - {field: microtrace.v0.OffNodeDerived.pod_uid, source: normalizer, gap2: [CTX-POD-IP-REUSE]}
+      - {field: microtrace.v0.OffNodeDerived.node_uid, source: normalizer, gap2: [OFFNODE-HOST-SIGNATURES]}
+      - {field: microtrace.v0.OffNodeDerived.remote_class, source: normalizer, gap2: [OFFNODE-PATH-COVERAGE]}
+    context_joins: [source address -> Pod UID or node host context (time-indexed address map), destination -> external]
+    state: {kind: keyed, key: [SOURCE_ADDRESS], window: W_H5}
+    parameters: [W_H5, rho_H5]
+    predicate: >-
+      For one source address S whose resolution is POD_ADDRESS or
+      NODE_HOST_CONTEXT, a successful database read by S is followed within
+      W_H5 by path-flow records from S to external destinations whose summed
+      octets reach rho_H5 times the bytes the read returned. Both halves are
+      observed off the source node; the agent joins them before publishing.
+      "Followed" means the flow interval ends after the read's corrected event
+      time plus both clock uncertainties.
+    evidence_threshold: >-
+      Suspected exfiltration attributed to a source address (a Pod or a node's
+      host context), not a process; the byte check is a consistency test and
+      does not show that the bytes sent are the bytes read.
+    weaker_output: none
+    abstain: [Source address AMBIGUOUS (overlapping holders or masquerade), bytes_returned not logged by the engine, Sampled flow records, Flow matches a declared host-component signature, Path-observer export gap overlapping the window.]
+    emits: [source_address, source_address_class, pod_uid, node_uid, boot_id, db_read_event, path_flows, destination, bytes_read, octets_out]
+    negative_controls: [Benign database read and egress from a Pod on the same node below rho_H5 or outside W_H5, Kubelet image pull from the node's host context, Egress of a declared hostNetwork Pod.]
+    gap2: [OFFNODE-DBAUDIT-SOURCE, OFFNODE-PATH-COVERAGE, OFFNODE-FLOW-EXPORT, OFFNODE-HOST-SIGNATURES, CTX-POD-IP-REUSE]
+
+witnesses:
+  - type: network-flow
+    class: direct
+    status: specified
+    join_key: FlowId or 5-tuple within uncertainty, connect->accept
+    key_origin: {flow: sensor}
+    window: W_w
+    fields: [microtrace.v0.SocketDetail.flow, microtrace.v0.SocketDetail.local, microtrace.v0.SocketDetail.remote]
+    gap2: [NODE-SOCKET-FLOW, NODE-ORIGIN-FORGERY]
+  - type: request-identity
+    class: direct
+    status: conditional
+    join_key: gateway-minted request ID shared by both findings; confirms only when request_id_origin is SENSOR. A propagated or client-supplied ID (origin WORKLOAD) raises q_w but never confirms.
+    key_origin: {request_id: gateway-minted}
+    window: W_w
+    fields: [microtrace.v0.GatewayObservation.request_id, microtrace.v0.GatewayObservation.request_id_origin]
+    gap2: [GW-STREAMED-SPLIT, GW-REQUEST-ID-ORIGIN]
+  - type: credential-read-to-use
+    class: direct
+    status: conditional
+    join_key: JTI of the read token version equals used_credential_id
+    key_origin: {jti: sensor, used_credential_id: sensor}
+    window: W_w
+    fields: [microtrace.v0.TokenFileVersion.jti, microtrace.v0.FileIdentity.projected, microtrace.v0.AuditDerived.used_credential_id]
+    gap2: [CRED-JTI-VERSION-INDEX, NODE-TOKEN-ROTATION, AUD-FIELDS-USEDTOKEN, AUD-ORIGIN-FORGERY]
+  - type: process-ancestry
+    class: direct
+    status: specified
+    join_key: source process is the target's process or an ancestor of it on the parent chain the sensor recorded at birth (proc.fork/proc.exec process and parent, per node and boot); shared lineage_id (process key of lineage root) is the index key, not the evidence; direction by node_seq; a chain broken by a lost birth is unresolved
+    key_origin: {lineage_id: sensor}
+    window: W_w
+    fields: [microtrace.v0.RawEbpfRecord.lineage_root, microtrace.v0.RawEbpfRecord.process, microtrace.v0.RawEbpfRecord.parent, microtrace.v0.RawEbpfRecord.node_seq, microtrace.v0.EbpfDerived.lineage_id]
+    gap2: [NODE-EXEC-LINEAGE, NODE-ORIGIN-FORGERY]
+  - type: host-transition
+    class: direct
+    status: specified
+    join_key: container lineage continuing into host namespaces on the same node, the host-side process being the source's process or a descendant of it on the recorded parent chain (as process-ancestry)
+    key_origin: {lineage_root: sensor}
+    window: W_w
+    fields: [microtrace.v0.NamespaceDetail.after, microtrace.v0.NamespaceDetail.host_reference, microtrace.v0.RawEbpfRecord.lineage_root]
+    gap2: [NODE-NS-TRANSITION]
+  - type: host-context
+    class: direct
+    status: conditional
+    join_key: (node identity, boot ID) of a host-level finding (C1b, or F1 at host scope) equals the node resolved for an off-node finding attributed to that node's host network context, within the node's degraded-trust epoch
+    key_origin: {node_uid: sensor, boot_id: sensor}
+    window: W_w
+    fields: [microtrace.v0.OffNodeDerived.source_address_class, microtrace.v0.OffNodeDerived.node_uid, microtrace.v0.OffNodeDerived.boot_id, microtrace.v0.OffNodeDerived.host_component_match, microtrace.v0.RawEbpfRecord.node_id, microtrace.v0.RawEbpfRecord.boot_id]
+    gap2: [OFFNODE-HOST-SIGNATURES, OFFNODE-PATH-COVERAGE, NODE-NS-TRANSITION]
+  - type: admission-instance
+    class: direct
+    status: conditional
+    join_key: admission resource_uid equals the later event's Pod UID; dry-run excluded
+    key_origin: {resource_uid: sensor, pod_uid: sensor}
+    window: W_w
+    fields: [microtrace.v0.AdmissionDecision.resource_uid, microtrace.v0.AdmissionDecision.dry_run, microtrace.v0.EbpfDerived.pod_uid]
+    gap2: [KYV-POD-UID-DRYRUN]
+  - type: control-plane-causality-instance
+    class: direct
+    status: conditional
+    join_key: binding UID proven the sole grant path for the later operation by historical effective-rights evaluation
+    key_origin: {binding_uid: sensor}
+    window: W_w
+    fields: [microtrace.v0.ObjectRef.uid, microtrace.v0.RbacSummary.subjects, microtrace.v0.RbacSummary.rules]
+    gap2: [F2-HISTORICAL-RIGHTS]
+  - type: control-plane-causality-class
+    class: enabling
+    status: specified
+    join_key: a grant that could have authorized the later operation
+    key_origin: {binding_uid: sensor}
+    window: W_w
+    fields: [microtrace.v0.ObjectRef.uid, microtrace.v0.RbacSummary.rules]
+    gap2: [F2-HISTORICAL-RIGHTS]
+  - type: image-class
+    class: enabling
+    status: specified
+    join_key: same image digest, no Pod-UID binding
+    key_origin: {image_digest: sensor}
+    window: W_w
+    fields: [microtrace.v0.AdmissionDecision.image_digests, microtrace.v0.ContainerStatusSummary.image_id]
+    gap2: [KYV-POD-UID-DRYRUN]

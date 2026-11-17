@@ -1,0 +1,342 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MicroTRACE Build Manifest Schema",
+  "description": "Manifest written by the generator for each run: seeds, versions, hashes, and generation metadata",
+  "type": "object",
+  "required": ["manifest_version", "run_id", "split", "generator_version", "generated_at"],
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "pattern": "^build-manifest\\.v[0-9]+$",
+      "description": "Manifest schema version"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique run identifier"
+    },
+    "split": {
+      "type": "string",
+      "enum": ["PILOT", "RESEARCH", "HELD_OUT"],
+      "description": "Dataset split classification"
+    },
+    "world_name": {
+      "type": "string",
+      "enum": ["Small", "Reference", "Large"],
+      "description": "Generated world size"
+    },
+    "scenario_ids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Ordered list of all scenario IDs selected for this run (resolved from 'all' if applicable)"
+    },
+    "duration_s": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Run duration in simulated seconds; determines run_id and world timeline"
+    },
+    "variant_per_scenario": {
+      "type": "object",
+      "description": "Mapping of scenario_id to variant_id used for each scenario in this run",
+      "additionalProperties": { "type": "string" }
+    },
+    "scenario_id": {
+      "type": "string",
+      "description": "Scenario catalogue entry ID (single-scenario build only)"
+    },
+    "scenario_variant": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Variant index within the scenario (single-scenario build only)"
+    },
+    "scenario_catalogue_version": {
+      "type": "string",
+      "description": "Frozen catalogue version hash or identifier"
+    },
+    "generator_version": {
+      "type": "string",
+      "description": "Generator code version or commit hash"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Generation timestamp (UTC)"
+    },
+    "generator_spec_version": {
+      "type": "string",
+      "pattern": "^generator-spec\\.v[0-9]+$",
+      "description": "Generator spec version used"
+    },
+    "capture_profile": {
+      "type": "string",
+      "enum": ["evaluated-v0", "research-superset-v0"],
+      "description": "Capture profile used for this run"
+    },
+    "rule_evaluation_mode": {
+      "type": "string",
+      "enum": ["all", "candidates"],
+      "description": "Rule evaluation mode"
+    },
+    "seeds": {
+      "type": "object",
+      "description": "Seeds for determinism (stored in restricted/seeds/)",
+      "required": ["generator_seed", "scenario_seed"],
+      "properties": {
+        "generator_seed": {
+          "type": "integer",
+          "description": "World generation seed"
+        },
+        "scenario_seed": {
+          "type": "integer",
+          "description": "Scenario variant selection seed"
+        },
+        "observability_seed": {
+          "type": "integer",
+          "description": "Observability profile seed (if degraded)"
+        },
+        "fault_seed": {
+          "type": "integer",
+          "description": "Fault injection seed (if applicable)"
+        }
+      }
+    },
+    "hashes": {
+      "type": "object",
+      "description": "Integrity hashes for generated artifacts",
+      "required": ["base_stream_sha256", "truth_sha256"],
+      "properties": {
+        "base_stream_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of canonical base stream"
+        },
+        "truth_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of truth tables (GroundTruthAction, FindingOpportunity, ActionLink)"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of this manifest itself"
+        }
+      }
+    },
+    "stream_statistics": {
+      "type": "object",
+      "description": "Statistics of the generated base stream",
+      "properties": {
+        "total_envelopes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total Envelope records in base stream"
+        },
+        "logical_id_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Distinct logical_id values"
+        },
+        "event_time_range": {
+          "type": "object",
+          "properties": {
+            "start_unix_seconds": { "type": "number" },
+            "end_unix_seconds": { "type": "number" }
+          }
+        },
+        "events_per_source_family": {
+          "type": "object",
+          "description": "Event count by source (gateway, audit, ebpf, context, etc.)",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "truth_statistics": {
+      "type": "object",
+      "description": "Statistics of truth tables",
+      "properties": {
+        "total_actions": {
+          "type": "integer",
+          "description": "GroundTruthAction record count"
+        },
+        "total_findings": {
+          "type": "integer",
+          "description": "FindingOpportunity record count"
+        },
+        "total_links": {
+          "type": "integer",
+          "description": "ActionLink record count"
+        },
+        "findings_by_state": {
+          "type": "object",
+          "properties": {
+            "PRESENT": { "type": "integer" },
+            "ABSENT": { "type": "integer" },
+            "UNOBSERVABLE": { "type": "integer" }
+          }
+        },
+        "findings_by_type": {
+          "type": "object",
+          "description": "Count per finding type (A1, A2, B1, ...)",
+          "additionalProperties": { "type": "integer" }
+        }
+      }
+    },
+    "template_usage": {
+      "type": "object",
+      "description": "Sources and templates used for benign background",
+      "properties": {
+        "source_templates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["BETH", "LID-DS-2021", "CSIC-2010", "K8NTEXT", "Kube-IDS0", "scripted"]
+              },
+              "pool": {
+                "type": "string",
+                "enum": ["DEV", "HELD_OUT_POOL"]
+              },
+              "record_count": { "type": "integer" },
+              "record_ids": {
+                "type": "array",
+                "description": "Sampled source record IDs or identifiers",
+                "items": { "type": "string" }
+              },
+              "transformation": {
+                "type": "string",
+                "description": "How source records were adapted"
+              },
+              "converter_version": {
+                "type": "string",
+                "description": "Converter code version"
+              },
+              "converter_command": {
+                "type": "string",
+                "description": "Exact conversion command for reproducibility"
+              }
+            }
+          }
+        },
+        "scripted_distributions": {
+          "type": "array",
+          "description": "Sources that were not templated and used scripted distributions instead",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string" },
+              "reason": {
+                "type": "string",
+                "description": "Why template was not used (e.g., licence, unavailable)"
+              }
+            }
+          }
+        }
+      }
+    },
+    "artifact_versions": {
+      "type": "object",
+      "description": "Versions of declared artifacts used",
+      "properties": {
+        "P_A": {
+          "type": "string",
+          "description": "Injection pattern set version hash"
+        },
+        "I_A2": {
+          "type": "string",
+          "description": "Response indicators version hash"
+        },
+        "S_B1": {
+          "type": "string",
+          "description": "B1 baseline version"
+        },
+        "E_D1": {
+          "type": "string",
+          "description": "D1 expected readers version"
+        },
+        "E_E2": {
+          "type": "string",
+          "description": "E2 expected writers version"
+        },
+        "E_F1": {
+          "type": "string",
+          "description": "F1 expected transitions version"
+        },
+        "Q_G1a": {
+          "type": "string",
+          "description": "G1a baseline version"
+        },
+        "Q_H1": {
+          "type": "string",
+          "description": "H1 baseline version"
+        },
+        "Q_H2": {
+          "type": "string",
+          "description": "H2 external destinations version"
+        }
+      }
+    },
+    "observability_profile": {
+      "type": "string",
+      "enum": ["clean", "degraded_gateway", "degraded_audit", "degraded_ebpf", "degraded_context"],
+      "description": "Observability degradation profile applied"
+    },
+    "completeness_guarantees": {
+      "type": "object",
+      "description": "Expected completeness per source family",
+      "properties": {
+        "gateway": {
+          "type": "object",
+          "properties": {
+            "expected_complete": { "type": "boolean" },
+            "loss_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "properties": {
+            "expected_complete": { "type": "boolean" },
+            "loss_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "ebpf": {
+          "type": "object",
+          "properties": {
+            "expected_complete": { "type": "boolean" },
+            "loss_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "expected_complete": { "type": "boolean" },
+            "loss_percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "archive_paths": {
+      "type": "object",
+      "description": "Paths to generated artifacts",
+      "properties": {
+        "base_stream": {
+          "type": "string",
+          "description": "Path to canonical base stream (length-delimited Protobuf)"
+        },
+        "truth_directory": {
+          "type": "string",
+          "description": "Directory containing truth files (restricted/)"
+        },
+        "archive_directory": {
+          "type": "string",
+          "description": "Evidence archive directory"
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Human-readable notes on generation anomalies or special cases"
+    }
+  }
+}

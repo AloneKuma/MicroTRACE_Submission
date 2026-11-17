@@ -1,0 +1,445 @@
+# MicroTRACE A2 injection success response indicators, version i_a2.v0
+#
+# Status: UNFROZEN
+# Version: i_a2.v0
+# Purpose: Detect indicators in HTTP response (status code, body size, body markers)
+#          that suggest injection payload was processed/accepted. Used in conjunction
+#          with P_A patterns to emit A2 findings.
+#
+# Structure: Each indicator_id targets a pattern class and declares a rule
+# (e.g., "HTTP 200 with response body size > threshold"), source citation,
+# and test vectors (positive/negative including benign error pages).
+#
+# Scope: Status-based indicators (200 after typical error), body-size anomalies,
+#        error signature markers (SQL errors, template errors), code execution markers.
+
+status: UNFROZEN
+version: i_a2.v0
+
+sources:
+  - name: OWASP Core Rule Set
+    url: https://github.com/coreruleset/coreruleset
+    version: "3.3.2"
+    license: "Apache License 2.0"
+    license_url: "https://github.com/coreruleset/coreruleset/blob/v3.3.2/LICENSE"
+  - name: OWASP Testing Guide - Response Analysis
+    url: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/
+    version: "v4.2"
+    license: "CC BY-SA 4.0"
+  - name: "SQL Injection error message signatures (SANS, PortSwigger)"
+    url: "https://portswigger.net/web-security/sql-injection"
+    version: "2024"
+    license: "Educational - fair use for signature collection"
+
+# Global parameters for response analysis
+response_analysis:
+  # Thresholds based on parameter-register.md settings
+  gateway_body_capture_cap: 65536  # 64 KiB per 2026-10-08 setting
+  response_time_anomaly_threshold_ms: 5000  # Response significantly slower than baseline
+
+indicators:
+  # ======================================================================
+  # SQL Injection indicators - Status and error messages
+  # ======================================================================
+  - indicator_id: "sqli_2xx_success"
+    class: "sql-injection"
+    rule: "HTTP response status 200-299 (success) after SQL injection pattern in request"
+    description: |
+      SQL injection payloads often trigger application errors; a success response
+      (2xx) is an indicator that the payload was accepted/processed. Combined with
+      a P_A SQL injection pattern match, suggests the injection succeeded.
+    pattern_type: "status"
+    status_codes: [200, 201, 202, 204]
+    source: "OWASP CRS rule 942400 (SQL Injection - Success Indicators)"
+    positive_tests:
+      - response_status: 200
+        pattern_id: "sqli_union"
+        body_snippet: "id,username,password"
+      - response_status: 200
+        pattern_id: "sqli_or_comment"
+        body_snippet: "admin data returned"
+    negative_tests:
+      - response_status: 200
+        pattern_id: "none"
+        body_snippet: "normal page content"
+      - response_status: 200
+        pattern_id: "xss_script_tag"  # Different pattern class
+        body_snippet: "generic response"
+
+  - indicator_id: "sqli_error_mysql"
+    class: "sql-injection"
+    rule: "Response body contains MySQL error messages"
+    description: |
+      MySQL syntax errors and database-specific exceptions indicate that
+      the injection was interpreted as SQL code. Common signatures include
+      'SQL syntax', 'mysql_fetch', 'MySQL', 'MYSQL_ERROR'.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(SQL\\s+syntax|mysql_fetch|mysql_error|MySQL|MYSQL_ERROR|You have an error)"
+      - "(?i)(Unknown\\s+table|Undefined\\s+column|Duplicate\\s+entry|Deadlock)"
+    source: "OWASP CRS rule 942420 (SQL Error Signatures)"
+    positive_tests:
+      - body_snippet: "MySQL ERROR 1064: You have an error in your SQL syntax"
+      - body_snippet: "mysql_fetch_assoc(): supplied argument is not a valid"
+      - body_snippet: "MYSQL_ERROR: Unknown table 'users'"
+    negative_tests:
+      - body_snippet: "This is a benign error page about database operations"
+      - body_snippet: "The MySQL documentation explains this feature"
+
+  - indicator_id: "sqli_error_oracle"
+    class: "sql-injection"
+    rule: "Response body contains Oracle database error messages"
+    description: |
+      Oracle-specific error patterns indicate SQL injection targeting Oracle databases.
+      Signatures include 'ORA-', 'Oracle', 'ora_sql'.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(ORA-[0-9]{4,5}|Oracle|ora_sql|Oracle\\s+error)"
+      - "(?i)(from\\s+dual|no rows selected|table or view does not exist)"
+    source: "OWASP CRS rule 942430 (Oracle Error Signatures)"
+    positive_tests:
+      - body_snippet: "ORA-00942: table or view does not exist"
+      - body_snippet: "ORA-00904: invalid column name"
+    negative_tests:
+      - body_snippet: "Oracle documentation and training materials"
+
+  - indicator_id: "sqli_error_mssql"
+    class: "sql-injection"
+    rule: "Response body contains MSSQL/T-SQL error messages"
+    description: |
+      MSSQL-specific errors like 'Incorrect syntax' indicate SQL injection.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(Incorrect\\s+syntax|MSSQL|T-SQL|SQL\\s+Server|System\\.Data\\.SqlClient)"
+      - "(?i)(com\\.microsoft\\.sqlserver|ODBC\\s+SQL\\s+Server)"
+    source: "OWASP CRS rule 942440 (MSSQL Error Signatures)"
+    positive_tests:
+      - body_snippet: "Incorrect syntax near the keyword 'SELECT'"
+      - body_snippet: "MSSQL: Message 156 (Incorrect syntax)"
+    negative_tests:
+      - body_snippet: "Information about SQL Server administration"
+
+  - indicator_id: "sqli_error_postgres"
+    class: "sql-injection"
+    rule: "Response body contains PostgreSQL error messages"
+    description: |
+      PostgreSQL errors indicate targeted SQL injection against Postgres backends.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(PostgreSQL|psql|ERROR:\\s+|FATAL:|pg_|postgresql)"
+      - "(?i)(relation.*does not exist|column.*does not exist|syntax error)"
+    source: "OWASP CRS rule 942450 (PostgreSQL Error Signatures)"
+    positive_tests:
+      - body_snippet: "ERROR: relation \"users\" does not exist"
+      - body_snippet: "PostgreSQL query error: column \"id\" does not exist"
+    negative_tests:
+      - body_snippet: "PostgreSQL is a relational database"
+
+  # ======================================================================
+  # XSS indicators - Page execution and reflectivity
+  # ======================================================================
+  - indicator_id: "xss_reflected_in_response"
+    class: "xss"
+    rule: "Exact matching pattern in request found reflected in response without HTML encoding"
+    description: |
+      If the request contains an XSS pattern and the exact string appears in the response
+      without HTML entity encoding (e.g., < as &lt;), the payload was reflected.
+      This is detected by comparing request pattern with response content.
+    pattern_type: "reflection"
+    source: "OWASP CRS rule 941310 (XSS Reflection Detection)"
+    positive_tests:
+      - request_pattern: "<script>"
+        response_contains: "<script>"
+      - request_pattern: "onload=test"
+        response_contains: "onload=test"
+    negative_tests:
+      - request_pattern: "<script>"
+        response_contains: "&lt;script&gt;"
+      - request_pattern: "onload=test"
+        response_contains: "onload=test&quot;"
+
+  - indicator_id: "xss_javascript_in_response"
+    class: "xss"
+    rule: "Response body contains executable JavaScript-like patterns"
+    description: |
+      Response contains JavaScript code that could execute if reflected XSS payload
+      was successful. Indicates successful injection and execution context.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(eval\\(|setTimeout|setInterval|window\\.location|document\\.write)"
+      - "(?i)(function\\s+\\w+\\(|var\\s+\\w+\\s*=|<script.*?</script>)"
+    source: "OWASP CRS rule 941320 (XSS Code Execution)"
+    positive_tests:
+      - body_snippet: "eval(atob('YWxlcnQoMSk='))"
+      - body_snippet: "<script>var x = 1; alert(x)</script>"
+    negative_tests:
+      - body_snippet: "Discussion about JavaScript security"
+      - body_snippet: '{"code": "var x = 1;"}'
+
+  # ======================================================================
+  # Path Traversal indicators - File content exposure
+  # ======================================================================
+  - indicator_id: "path_traversal_sensitive_content"
+    class: "path-traversal"
+    rule: "Response body contains markers of sensitive file content (etc/passwd, config files)"
+    description: |
+      Successful path traversal results in file content being returned.
+      Indicators include /etc/passwd format (user:pass:uid), config file syntax.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "root:[^:]*:[0-9]+:[0-9]+:"
+      - "(?i)(database_url|api_key|secret_key)"
+    source: "OWASP Testing Guide - Path Traversal File Content"
+    positive_tests:
+      - body_snippet: "root:*:0:0:System Administrator"
+      - body_snippet: "API_KEY value here"
+      - body_snippet: "database_url=postgres://localhost"
+    negative_tests:
+      - body_snippet: "Guide to /etc/passwd file format"
+      - body_snippet: "Configuration files store application settings"
+
+  - indicator_id: "path_traversal_error"
+    class: "path-traversal"
+    rule: "HTTP 200-299 status despite path traversal pattern (file was accessed)"
+    description: |
+      Successful path traversal returns the target file content with HTTP 200.
+      Failed attempts typically return 404 or 403. A 200 after path traversal
+      pattern suggests file access succeeded.
+    pattern_type: "status"
+    status_codes: [200, 201, 206]
+    source: "OWASP CRS rule 930300 (Path Traversal Success)"
+    positive_tests:
+      - response_status: 200
+        pattern_id: "path_traversal_dotdot"
+        body_snippet: "file contents or config data"
+    negative_tests:
+      - response_status: 404
+        pattern_id: "path_traversal_dotdot"
+      - response_status: 403
+        pattern_id: "path_traversal_dotdot"
+
+  # ======================================================================
+  # OS Command Injection indicators - Command execution results
+  # ======================================================================
+  - indicator_id: "cmd_injection_execution_output"
+    class: "os-command-injection"
+    rule: "Response contains output of executed commands (id, whoami, ping, ls output)"
+    description: |
+      Successful command injection results in the output of the executed command
+      being returned. Patterns include command output markers: user IDs (uid=0),
+      hostnames, directory listings, ping response times.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "uid=[0-9]+"
+      - "gid=[0-9]+"
+      - "total [0-9]+"
+    source: "OWASP CRS rule 932200 (Command Execution Output)"
+    positive_tests:
+      - body_snippet: "uid=0 gid=0"
+      - body_snippet: "total 24 drwxr-xr-x"
+      - body_snippet: "uid=33 gid=33"
+    negative_tests:
+      - body_snippet: "Documentation about the id command"
+      - body_snippet: "File permissions are represented as rwx"
+
+  - indicator_id: "cmd_injection_reverse_shell"
+    class: "os-command-injection"
+    rule: "Response or connection indicators of reverse shell execution"
+    description: |
+      Reverse shell injection may show connection establishment or shell prompt.
+      Indicators include bash/sh prompts appearing in output, connection traces.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "bash-[0-9]"
+      - "sh-[0-9].*#"
+      - "(?i)ncat|socat"
+    source: "OWASP Testing Guide - Reverse Shell Indicators"
+    positive_tests:
+      - body_snippet: "bash-5.0# whoami"
+      - body_snippet: "sh-4.2# id"
+      - body_snippet: "ncat listening"
+    negative_tests:
+      - body_snippet: "Discussion of bash shell features"
+
+  # ======================================================================
+  # CRLF/Header Injection indicators - Header and response manipulation
+  # ======================================================================
+  - indicator_id: "crlf_injection_response_pollution"
+    class: "crlf-injection"
+    rule: "Response contains injected HTTP headers or unusual status codes"
+    description: |
+      CRLF injection can result in injected headers appearing in responses or
+      unexpected status codes/content appearing. Indicators include Set-Cookie,
+      Location, Content-Type appearing where unexpected.
+    pattern_type: "response_header"
+    source: "OWASP CRS rule 930400 (CRLF Header Injection Indicators)"
+    positive_tests:
+      - response_header_injected: "Set-Cookie"
+      - response_header_injected: "Location"
+      - injected_content: "HTTP/1.1 200 OK\\r\\nX-Injected: true"
+    negative_tests:
+      - response_header_injected: "Content-Type"  # Normal header
+      - injected_content: "standard HTTP response"
+
+  - indicator_id: "crlf_injection_blank_line"
+    class: "crlf-injection"
+    rule: "Response split (CRLF+blank line) with attacker-controlled body content"
+    description: |
+      HTTP response splitting results in injected content appearing after a blank
+      line in the HTTP response. This indicates the injection was successful.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(%0d%0a%0d%0a|\\r\\n\\r\\n)"
+    source: "OWASP CRS rule 930410 (HTTP Response Splitting)"
+    positive_tests:
+      - body_snippet: "HTTP/1.1 200 OK%0d%0a%0d%0a<injected>"
+      - body_snippet: "test%0d%0a%0d%0aHTTP"
+    negative_tests:
+      - body_snippet: "Normal HTTP response with body"
+
+  # ======================================================================
+  # SSTI (Server-Side Template Injection) indicators - Template execution
+  # ======================================================================
+  - indicator_id: "ssti_template_evaluation"
+    class: "ssti"
+    rule: "Response shows evaluation result of template expression"
+    description: |
+      SSTI occurs when template engines evaluate injected expressions. Indicators
+      include: mathematical expressions being computed (7*7=49), template variable
+      lookups succeeding, config values appearing in response.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "\\b49\\b"
+      - "\\b343\\b"
+      - "(?i)config\\."
+    source: "OWASP Testing Guide - SSTI Response Analysis"
+    positive_tests:
+      - body_snippet: "Result: 49"
+      - body_snippet: "value is 343"
+      - body_snippet: "config.SECRET_KEY"
+    negative_tests:
+      - body_snippet: "The number 49 is interesting"
+      - body_snippet: "Configuration values are important"
+
+  - indicator_id: "ssti_error_templates"
+    class: "ssti"
+    rule: "Response contains template engine error messages"
+    description: |
+      Template engine errors (Jinja2, Mako, Freemarker, Velocity) indicate
+      template expression evaluation was attempted. Error messages reveal engine type.
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(jinja2|mako|freemarker|velocity|groovy|django)"
+      - "(?i)(UndefinedError|TemplateAssertionError|syntax error in template)"
+      - "(?i)(TemplateSyntaxError|ExpressionError|CompilationError)"
+    source: "OWASP CRS rule 941320 (SSTI Engine Error Detection)"
+    positive_tests:
+      - body_snippet: "jinja2.exceptions.UndefinedError: 'x' is undefined"
+      - body_snippet: "freemarker.template.TemplateSyntaxError: Unexpected character"
+    negative_tests:
+      - body_snippet: "Information about Jinja2 template engine"
+
+  # ======================================================================
+  # Web Shell Upload indicators - Upload success and execution
+  # ======================================================================
+  - indicator_id: "webshell_upload_success"
+    class: "webshell-upload"
+    rule: "HTTP 200-299 response to file upload request with executable extension"
+    description: |
+      Successful web shell uploads return 200-299 status codes. Combined with
+      executable file patterns (PHP, ASP, JSP, etc.), indicates upload succeeded.
+    pattern_type: "status"
+    status_codes: [200, 201, 204, 301, 302]
+    source: "OWASP CRS rule 930500 (File Upload Success)"
+    positive_tests:
+      - response_status: 200
+        pattern_id: "webshell_upload_php"
+        body_snippet: "File uploaded successfully"
+      - response_status: 201
+        pattern_id: "webshell_upload_executable"
+    negative_tests:
+      - response_status: 400
+        pattern_id: "webshell_upload_php"
+      - response_status: 403
+        pattern_id: "webshell_upload_executable"
+
+  - indicator_id: "webshell_execution_output"
+    class: "webshell-upload"
+    rule: "Response contains output from executed web shell (command execution markers)"
+    description: |
+      Once uploaded and executed, web shells typically execute commands and return
+      output. Same indicators as command injection (id output, directory listings,
+      command execution markers).
+    pattern_type: "body_marker"
+    body_regexes:
+      - "(?i)(uid=[0-9]+|gid=[0-9]+|groups=)"  # id command from shell
+      - "(?i)(bash:|sh:|\\$\\s)"  # Shell prompt
+      - "(?i)(total\\s+[0-9]+.*?(d|r|w|x){9})"  # ls -la output
+    source: "OWASP Testing Guide - Web Shell Verification"
+    positive_tests:
+      - body_snippet: "uid=33(www-data) gid=33(www-data) groups=33(www-data)"
+      - body_snippet: "bash-5.0$ id"
+    negative_tests:
+      - body_snippet: "Documentation about web server privileges"
+
+  - indicator_id: "webshell_access_log"
+    class: "webshell-upload"
+    rule: "Multiple rapid requests to uploaded file location (execution attempts)"
+    description: |
+      After uploading a web shell, attackers make multiple requests to the file
+      location to execute commands. Multiple requests in short timeframe to
+      suspicious file names indicates active shell usage.
+    pattern_type: "temporal"
+    source: "OWASP Testing Guide - Web Shell Activity Patterns"
+    positive_tests:
+      - request_count: 10
+        time_window_seconds: 5
+        file_pattern: "shell|backdoor|webshell|cmd|execute"
+    negative_tests:
+      - request_count: 2
+        time_window_seconds: 300
+        file_pattern: "normal"
+
+# Body size anomaly thresholds
+body_size_analysis:
+  # Injections that succeed typically change response size
+  # SQL injection with data exfiltration: larger responses expected
+  sqli_expected_size_increase_min_bytes: 1000
+  # Template injection evaluation errors are typically verbose
+  ssti_expected_error_size_min_bytes: 500
+  # Command execution output varies; small responses can still indicate execution
+  cmd_injection_expected_output_min_bytes: 50
+
+# Benign error page negative control examples
+benign_error_pages:
+  - name: "Generic 500 error"
+    status: 500
+    body_snippet: "Internal Server Error - An unexpected error occurred"
+    should_not_match:
+      - "sqli_error_mysql"
+      - "sqli_error_oracle"
+  - name: "Application-custom error"
+    status: 400
+    body_snippet: "Invalid request - please check your input"
+    should_not_match:
+      - "xss_javascript_in_response"
+      - "cmd_injection_execution_output"
+  - name: "Generic file not found"
+    status: 404
+    body_snippet: "The requested resource was not found"
+    should_not_match:
+      - "path_traversal_sensitive_content"
+
+# Detection notes
+detection_notes: |
+  A2 indicators are used in combination with A1 pattern matches. The rule is:
+  A1 holds for request_id AND the same request's response matches an indicator
+  in I_A2 declared for that pattern class.
+
+  Indicators should be piloted against benign error pages to ensure false
+  positive rates are acceptably low. The negative_controls section lists
+  examples of benign responses that must not trigger indicators.
+
+  Response analysis respects the gateway body capture cap (64 KiB per 2026-10-08);
+  body_marker indicators operate only on captured body content. If body_truncated
+  is true, body-based indicators abstract to status-based indicators only.

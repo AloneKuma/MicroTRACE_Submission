@@ -1,0 +1,21 @@
+diff --git a/pidsmaker/tgn.py b/pidsmaker/tgn.py
+index 12990c1..235f744 100644
+--- a/pidsmaker/tgn.py
++++ b/pidsmaker/tgn.py
+@@ -187,7 +187,15 @@ class TGNMemory(torch.nn.Module):
+             # As we load directly the memory from a pkl file, I don't think we need this line anymore so we
+             # removed it. If results become strange in the future, try to add this line back to ensure it
+             # doen't affect performance.
+-            self._update_memory(torch.arange(self.num_nodes, device=self.memory.device))
++            # MicroTRACE patch: the one-shot flush over all nodes needs more than the
++            # 22 GB of an L4 on THEIA_E3. Each chunk is computed from the memory as it
++            # was before the flush, and all chunks are written at the end, so the
++            # result is the same as one call over all nodes.
++            n_all = torch.arange(self.num_nodes, device=self.memory.device)
++            updates = [(c, *self._get_updated_memory(c)) for c in n_all.split(50_000)]
++            for c, memory, last_update in updates:
++                self.memory[c] = memory
++                self.last_update[c] = last_update
+             self._reset_message_store()
+         super().train(mode)
+ 

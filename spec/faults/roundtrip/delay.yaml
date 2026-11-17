@@ -1,0 +1,13 @@
+# Roundtrip fault plan: delivery delay (20 % of eBPF records delayed by 3 s)
+# Stage: source — delayed records arrive out of order relative to watermarks.
+# Expected reconcile: all records received; no drops; late records arrive after
+# the watermark that promised an earlier bound.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: ebpf-delay-3s
+    kind: delay
+    stage: source
+    delay: 3s
+    rate: 0.20
+    select: {sources: [EBPF]}

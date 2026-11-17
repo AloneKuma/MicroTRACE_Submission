@@ -1,0 +1,43 @@
+diff --git a/pidsmaker/config/config.py b/pidsmaker/config/config.py
+index dcb3175..af118b3 100644
+--- a/pidsmaker/config/config.py
++++ b/pidsmaker/config/config.py
+@@ -1,3 +1,4 @@
++import json
+ import os
+ 
+ DATASET_DEFAULT_CONFIG = {
+@@ -541,6 +542,12 @@ DATASET_DEFAULT_CONFIG = {
+ 
+ # Arguments
+ 
++# MicroTRACE: our converted datasets (converter config.json), kept apart from the DARPA entries.
++_MT_DATASETS = os.path.join(os.path.dirname(__file__), "mt_datasets.json")
++if os.path.exists(_MT_DATASETS):
++    with open(_MT_DATASETS) as _fh:
++        DATASET_DEFAULT_CONFIG.update(json.load(_fh))
++
+ TASK_DEPENDENCIES = {
+     "construction": [],
+     "transformation": ["construction"],
+diff --git a/pidsmaker/utils/dataset_utils.py b/pidsmaker/utils/dataset_utils.py
+index be7e202..8bda7fc 100644
+--- a/pidsmaker/utils/dataset_utils.py
++++ b/pidsmaker/utils/dataset_utils.py
+@@ -1,3 +1,4 @@
++import json
+ from pidsmaker.config import get_node_feats_from_cfg
+ from pidsmaker.utils.utils import init_database_connection
+ 
+@@ -478,6 +479,11 @@ DARPA_TC_DATASETS = {
+     "FIVEDIRECTIONS_E5",
+     "FIVEDIRECTIONS_E3",
+ }
++# MicroTRACE: our converted datasets use the DARPA TC event types (pidsmaker/config/mt_datasets.json).
++_MT_DATASETS = os.path.join(os.path.dirname(__file__), "..", "config", "mt_datasets.json")
++if os.path.exists(_MT_DATASETS):
++    with open(_MT_DATASETS) as _fh:
++        DARPA_TC_DATASETS = set(DARPA_TC_DATASETS) | set(json.load(_fh))
+ OPTC_DATASETS = {"optc_h201", "optc_h501", "optc_h051"}
+ ATLASv2_DATASETS = {"atlasv2_h1"}
+ graph_processor_carbon_black_edr_datasets = {"atlasv2_edr", "carbanakv2_edr"}

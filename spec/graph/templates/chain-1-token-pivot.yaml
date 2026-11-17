@@ -1,0 +1,13 @@
+# TGS gap-analysis template (tgs-contract.md section 5). Shared task
+# knowledge for both Exp. 5 investigators: finding types and tactics only,
+# never instance values (UIDs, names, times, or which stage is missing).
+# The sources that can supply each stage are derived from the rulebook.
+template_version: tgs-template.v0
+id: chain-1-token-pivot
+status: provisional     # until the dataset build fixes the Exp. 5 chain families
+basis: docs/design/design-spec.md section 3, Chain 1
+stages:
+  - {id: credential-read, finding_types: [D1], tactic: CREDENTIAL_ACCESS, required: true}
+  - {id: api-enumeration, finding_types: [B1], tactic: DISCOVERY, required: true}
+  - {id: rbac-grant, finding_types: [F2], tactic: PRIVILEGE_ESCALATION, required: false}       # conditional type
+  - {id: cross-workload-access, finding_types: [G1b], tactic: LATERAL_MOVEMENT, required: false}  # conditional type

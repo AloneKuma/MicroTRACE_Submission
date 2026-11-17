@@ -1,0 +1,87 @@
+// MicroTRACE Gap 1 schema v0: incidents (incidents.v0).
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+
+enum IncidentStatus {
+  INCIDENT_STATUS_UNSPECIFIED = 0;
+  INCIDENT_OPEN = 1;
+  INCIDENT_SEALED = 2;
+  // Post-seal analyst amendment; the sealed prediction snapshot is unchanged.
+  INCIDENT_AMENDED = 3;
+}
+
+message RankedPath {
+  string path_id = 1;
+  repeated string finding_ids = 2;
+  repeated string witness_ids = 3;
+  // Geometric mean of link scores; absent until parameters are frozen.
+  optional double score = 4;
+}
+
+message SourceCompletenessState {
+  repeated string at_seal_excluded_sources = 1;
+  repeated string current_excluded_sources = 2;
+}
+
+enum NodeEpochKind {
+  NODE_EPOCH_KIND_UNSPECIFIED = 0;
+  // Opened by a processed trigger finding (C1b host-namespace transition).
+  NODE_EPOCH_CONFIRMED = 1;
+  // Unexplained sequence gap or silence; not built (no rule separates it from idle).
+  NODE_EPOCH_SUSPECTED = 2;
+}
+
+// A node-trust epoch on (node_id, boot_id): evidence from that boot received
+// off-node at or after tau_n is degraded. Ends when the node is re-provisioned
+// (a new boot ID).
+message NodeEpoch {
+  string node_id = 1;
+  string boot_id = 2;
+  google.protobuf.Timestamp tau_n = 3;
+  string trigger_finding_id = 4;
+  NodeEpochKind kind = 5;
+}
+
+message Amendment {
+  uint32 version = 1;
+  string reason = 2;
+  repeated string late_finding_ids = 3;
+  google.protobuf.Timestamp amended_at = 4;
+}
+
+message Incident {
+  string incident_id = 1;
+  string anchor_finding_id = 2;
+  EntityRef anchor_entity = 3;
+  repeated string aliases = 4;
+  uint32 version = 5;
+  repeated string finding_ids = 6;
+  // DIRECT witnesses with status CONFIRMED only.
+  repeated string link_witness_ids = 7;
+  repeated RankedPath ranked_paths = 8;
+  // Unbridged hypotheses; excluded from reconstruction metrics.
+  repeated RankedPath speculative_paths = 9;
+  google.protobuf.Timestamp event_start = 10;
+  google.protobuf.Timestamp event_end = 11;
+  IncidentStatus status = 12;
+  google.protobuf.Timestamp watermark_time = 13;
+  SourceCompletenessState source_completeness = 14;
+  // 15, 16: expected/unsupported tactics moved to TGS hypothesis records;
+  // 18: the graph's applied offsets moved to the TGS snapshot (2026-10-10).
+  reserved 15, 16, 18;
+  reserved "expected_tactics", "unsupported_tactics", "graph_frontier";
+  string sealed_prediction_version = 17;
+  string decision_version = 19;
+  repeated Amendment amendments = 20;
+  // Every node-trust epoch on a boot that supplied eBPF evidence to a member.
+  repeated NodeEpoch node_epochs = 21;
+  // Required input frontier of this version: "topic/partition" -> offset of
+  // the last record it cites there (member findings, their input events, the
+  // events of its witnesses' contradictions). The TGS shows this version as
+  // current only once it has applied at least these offsets.
+  map<string, int64> input_frontier = 22;
+}

@@ -1,0 +1,4 @@
+# Exp. 3 sessions the scoring job scores (score_job_aws.sh): session, set, main params, ONLY (or -).
+# 2026-11-17 re-run of the missing conditions (experiments/exp3/FIXES-2026-11-17.md).
+# 2026-11-17 scoped-loss re-run (post-hoc; frozen Full and full_scoped on the same streams).
+exp3-ls	held_out	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	loss-transit-05,loss-transit-10,loss-transit-20

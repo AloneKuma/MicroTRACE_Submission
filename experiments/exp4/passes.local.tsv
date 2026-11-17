@@ -1,0 +1,17 @@
+# Local dry run (development data, no AWS): the same GO units on a small run list, workers 2, and a
+# stub command unit in place of ORTHRUS (no PIDSMaker locally) to exercise prep/train/detect steps.
+unit	system	config	workload	workers	timed	train	prep
+ref_m1	go	exhaustive	m1	2	no	no	no
+full_m1	go	full	m1	2	yes	no	no
+noindex_m1	go	no_index	m1	2	yes	no	no
+unbounded_m1	go	unbounded	m1	2	yes	no	no
+reduced_k_m1	go	reduced_k	m1	2	yes	no	no
+reduced_l_m1	go	reduced_l	m1	2	yes	no	no
+reduced_t_m1	go	reduced_t	m1	2	yes	no	no
+ref_m2	go	exhaustive	m2	2	no	no	no
+full_m2	go	full	m2	2	yes	no	no
+noindex_m2	go	no_index	m2	2	yes	no	no
+full_m4	go	full	m4	2	yes	no	no
+noindex_m4	go	no_index	m4	2	yes	no	no
+stub	stub	stub	-	-	yes	yes	yes
+stub_capped	stub_slow	stub_slow	-	-	yes	no	no

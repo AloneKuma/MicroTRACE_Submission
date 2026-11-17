@@ -1,0 +1,697 @@
+schema_version: generator-spec.v0
+status: unfrozen
+description: |
+  MicroTRACE generator specification: world sizes, service topologies, churn rates,
+  background activity profiles, observability models, clock models, and declared
+  artifacts for the semi-synthetic dataset. Numeric values are unfrozen until
+  pilot runs; see parameter-register.md for tuning decisions.
+
+# World definitions: logical topology and object counts (from dataset-generator-design.md, section 5)
+worlds:
+  Small:
+    description: Fixture and low-load controls
+    logical_kubernetes_workers:
+      pilot_default: 3
+      frozen: null
+    application_services:
+      pilot_default: 12
+      frozen: null
+    concurrent_pods:
+      description: Distinct live Pod UIDs (not reused names)
+      pilot_default: 24
+      frozen: null
+    concurrent_containers:
+      description: Container instances per run (includes sidecars)
+      pilot_default: 28
+      frozen: null
+    pod_delete_recreate_transitions:
+      pilot_default: 2
+      frozen: null
+    sidecar_containers:
+      pilot_default: 2
+      frozen: null
+
+  Reference:
+    description: Main detection and correlation runs
+    logical_kubernetes_workers:
+      pilot_default: 4
+      frozen: null
+    application_services:
+      pilot_default: 24
+      frozen: null
+    concurrent_pods:
+      pilot_default: 48
+      frozen: null
+    concurrent_containers:
+      pilot_default: 56
+      frozen: null
+    pod_delete_recreate_transitions:
+      pilot_default: 6
+      frozen: null
+    sidecar_containers:
+      pilot_default: 8
+      frozen: null
+
+  Large:
+    description: Higher-scale sensitivity; Exp. 4 scales archived findings
+    logical_kubernetes_workers:
+      pilot_default: 8
+      frozen: null
+    application_services:
+      pilot_default: 50
+      frozen: null
+    concurrent_pods:
+      pilot_default: 100
+      frozen: null
+    concurrent_containers:
+      pilot_default: 110
+      frozen: null
+    pod_delete_recreate_transitions:
+      pilot_default: 10
+      frozen: null
+    sidecar_containers:
+      pilot_default: 15
+      frozen: null
+
+# Service topology and graph shapes
+service_graph_shapes:
+
+  layered_web_shop:
+    name: Layered web application with frontend, business logic, and storage
+    description: |
+      Multi-tier architecture mimicking an e-commerce platform.
+      - Frontend tier: API gateway, web servers
+      - Business logic: Order service, catalog service, search service
+      - Storage: Databases, message broker, cache
+      - Infrastructure: Authentication, logging, monitoring
+    service_domains:
+      - name: edge_and_identity
+        services: 4
+        description: API gateway, authentication, request routing, rate limiting
+      - name: catalog_and_discovery
+        services: 5
+        description: Product catalog, search, recommendations, inventory query
+      - name: ordering_and_payment
+        services: 6
+        description: Order creation, payment processing, billing, checkout
+      - name: fulfillment_and_inventory
+        services: 5
+        description: Warehouse management, shipping, inventory sync, tracking
+      - name: customer_and_reporting
+        services: 4
+        description: Customer profiles, analytics, reporting, notifications
+    inter_service_edges:
+      description: Directed caller→callee edges with legitimate traffic
+      example_edges:
+        - from: gateway
+          to: [auth, order_service, catalog_service]
+        - from: order_service
+          to: [payment_service, inventory_service, database]
+        - from: catalog_service
+          to: [search_service, cache, database]
+    replicas_per_service:
+      pilot_default: 2
+      frozen: null
+    fan_out_max:
+      description: Maximum fan-out from one service caller
+      pilot_default: 5
+      frozen: null
+    queues_and_datastores:
+      - message_broker_pods:
+          pilot_default: 1
+          frozen: null
+      - database_pods:
+          pilot_default: 2
+          frozen: null
+      - cache_pods:
+          pilot_default: 1
+          frozen: null
+
+  event_driven_with_broker:
+    name: Event-driven architecture with message broker and async consumers
+    description: |
+      Publish-subscribe topology with central event broker, multiple independent
+      consumers, and asynchronous processing chains.
+      - Event producers: API, sensors, scheduled jobs
+      - Broker: Kafka or similar message queue
+      - Consumers: Analytics, notifications, audit, data pipelines
+      - Aggregators: Results database, event store
+    service_domains:
+      - name: producers
+        services: 3
+        description: API endpoint, sensor collection, scheduled task
+      - name: broker_and_aggregation
+        services: 2
+        description: Message broker, event store
+      - name: consumers
+        services: 8
+        description: Analytics processor, notification service, audit logger, data pipeline, backup, replication, alerting, monitoring
+    inter_service_edges:
+      description: Many-to-many through broker; fan-out and fan-in patterns
+      broker_topic_count:
+        pilot_default: 4
+        frozen: null
+    replicas_per_service:
+      pilot_default: 2
+      frozen: null
+
+  fan_out_reporting:
+    name: Fan-out reporting and aggregation
+    description: |
+      Collector receives from many sources, aggregates, and distributes to multiple
+      reporting backends and dashboards.
+      - Collectors: Time-series, logs, traces, metrics
+      - Aggregators: Rolling windows, materialized views
+      - Output services: Dashboards, long-term storage, alerts
+    service_domains:
+      - name: sources
+        services: 4
+        description: Metric collector, log collector, trace collector, event collector
+      - name: aggregation
+        services: 3
+        description: Time-series aggregator, log processor, trace aggregator
+      - name: output
+        services: 3
+        description: Dashboard backend, storage writer, alert router
+    replicas_per_service:
+      pilot_default: 2
+      frozen: null
+    fan_in_max:
+      pilot_default: 10
+      frozen: null
+
+# Pod and container lifecycle: churn and reuse patterns
+churn_and_reuse:
+
+  pod_delete_recreate:
+    description: Pod deletion and immediate recreation (e.g., rollouts, crashloops)
+    frequency:
+      pilot_default: 1 per 100 benign events
+      frozen: null
+    interval_seconds:
+      description: Time between deletion and recreation of the same Pod UID
+      pilot_default: 5
+      frozen: null
+
+  pod_ip_reuse:
+    description: Pod IP address assigned to different Pod UIDs over time
+    enabled:
+      pilot_default: true
+      frozen: null
+    reuse_delay_seconds:
+      description: Minimum delay before an IP is reassigned
+      pilot_default: 30
+      frozen: null
+    frequency:
+      description: Probability an IP is reused in a run
+      pilot_default: 0.3
+      frozen: null
+
+  process_pid_reuse:
+    description: PID assigned to different process UIDs (containers restart)
+    enabled:
+      pilot_default: true
+      frozen: null
+    reuse_delay_seconds:
+      pilot_default: 10
+      frozen: null
+    frequency:
+      pilot_default: 0.5
+      frozen: null
+
+  token_rotation:
+    description: ServiceAccount token version change (secret rotation)
+    enabled:
+      pilot_default: true
+      frozen: null
+    rotation_frequency:
+      description: Token rotations per run
+      pilot_default: 2
+      frozen: null
+    token_lifetime_seconds:
+      pilot_default: 3600
+      frozen: null
+
+  image_rollouts:
+    description: Container image updates and rollback patterns
+    enabled:
+      pilot_default: true
+      frozen: null
+    rollout_frequency:
+      description: Image rollouts per run
+      pilot_default: 3
+      frozen: null
+    rollback_probability:
+      pilot_default: 0.1
+      frozen: null
+
+# Background activity profiles per service
+background_profiles:
+
+  request_rates:
+    description: HTTP request mix and rates per service
+    baseline_requests_per_second:
+      pilot_default: 10
+      frozen: null
+    peak_multiplier:
+      pilot_default: 3
+      frozen: null
+    request_mix:
+      - method: GET
+        percentage: 70
+      - method: POST
+        percentage: 20
+      - method: PUT
+        percentage: 7
+      - method: DELETE
+        percentage: 3
+    inter_arrival_distribution:
+      pilot_default: exponential
+      frozen: null
+
+  process_activity:
+    description: Background process spawning, syscalls, file activity
+    process_spawn_rate_per_container_per_minute:
+      pilot_default: 0.5
+      frozen: null
+    file_open_rate_per_process_per_minute:
+      pilot_default: 10
+      frozen: null
+    network_connection_rate_per_process_per_minute:
+      pilot_default: 2
+      frozen: null
+    external_egress_rate_per_container_per_minute:
+      description: >
+        Benign outbound transfers to external endpoints (connect, then a flow
+        with bytes out, seen by eBPF and the path observer). Without them only
+        attack scenarios would produce flow counters and path-flow records.
+      pilot_default: 0.3
+      frozen: null
+    background_syscall_families:
+      - openat
+      - read
+      - write
+      - close
+      - epoll_wait
+      - futex
+      - mmap
+
+  audit_activity:
+    description: Kubernetes API audit trail for controllers and operators
+    audit_events_per_minute_baseline:
+      pilot_default: 100
+      frozen: null
+    admission_reviews_per_service_per_minute:
+      description: >
+        Background admission reviews of a service's live Pods (UPDATE: label and
+        annotation patches). Without them a run holds only a few churn
+        admissions and one scenario admission changes the Kyverno count.
+      pilot_default: 0.2
+      frozen: null
+    event_types:
+      - list
+      - get
+      - watch
+      - create
+      - patch
+      - delete
+    controller_service_accounts:
+      count:
+        pilot_default: 5
+        frozen: null
+    operator_actions:
+      description: Legitimate operator kubectl and API calls
+      typical_actions:
+        - pods/logs
+        - pods/exec
+        - secret get
+        - secret list
+        - rbac mutations
+      frequency_per_run:
+        pilot_default: 20
+        frozen: null
+
+# Observability profiles: data quality, gaps, and uncertainty
+observability_profiles:
+
+  clean:
+    description: No faults or missing observations; all sources complete
+    gateway_observer_status:
+      pilot_default: operational
+      frozen: null
+    audit_feed_status:
+      pilot_default: complete
+      frozen: null
+    ebpf_probe_status:
+      pilot_default: all_attached
+      frozen: null
+    context_watch_status:
+      pilot_default: caught_up
+      frozen: null
+    clock_confidence:
+      pilot_default: high
+      frozen: null
+
+  degraded_gateway:
+    description: Gateway observer loses observations or becomes slow
+    observer_outage_duration_seconds:
+      pilot_default: 5
+      frozen: null
+    observer_loss_percentage:
+      pilot_default: 15
+      frozen: null
+    slow_body_capture_enabled:
+      description: Whether slow body capture is enabled in this profile
+      pilot_default: true
+      frozen: null
+
+  degraded_audit:
+    description: Audit feed has gaps, truncation, or delay
+    feed_gap_duration_seconds:
+      pilot_default: 10
+      frozen: null
+    event_loss_percentage:
+      pilot_default: 10
+      frozen: null
+    truncation_enabled:
+      pilot_default: true
+      frozen: null
+
+  degraded_ebpf:
+    description: eBPF probe attachment fails or drops events
+    probe_loss_percentage:
+      pilot_default: 20
+      frozen: null
+    probe_gap_duration_seconds:
+      description: Length of each window in which a node's probes drop every event
+      pilot_default: 10
+      frozen: null
+    syscall_families_lost:
+      - ptrace
+      - clone
+      - fork
+
+  degraded_context:
+    description: Context watch misses Pod/Service changes or lags
+    watch_gap_duration_seconds:
+      pilot_default: 15
+      frozen: null
+    watch_gap_percentage:
+      description: Share of the run covered by watch gaps (no watch events delivered)
+      pilot_default: 10
+      frozen: null
+    reuse_ambiguity_enabled:
+      description: Pod IP or PID reuse without clear boundary observation
+      pilot_default: true
+      frozen: null
+
+# Clock models: time basis and uncertainty per source family
+clock_models:
+
+  gateway:
+    description: API gateway observer clock (Envoy, ingress controller)
+    time_basis:
+      pilot_default: system_clock
+      frozen: null
+    epsilon_relative:
+      description: Max relative clock error vs. system clock
+      pilot_default: 0.001
+      frozen: null
+    epsilon_absolute_ms:
+      description: Max absolute drift per source instance
+      pilot_default: 10
+      frozen: null
+    skew_per_run_ms:
+      description: One-way skew injected in this run
+      pilot_default: 0
+      frozen: null
+
+  audit:
+    description: Kubernetes API audit (kube-apiserver)
+    time_basis:
+      pilot_default: system_clock
+      frozen: null
+    epsilon_relative:
+      pilot_default: 0.0005
+      frozen: null
+    epsilon_absolute_ms:
+      pilot_default: 5
+      frozen: null
+    skew_per_run_ms:
+      pilot_default: 0
+      frozen: null
+    stage_delay_ms:
+      description: Delay between RequestReceived, ResponseStarted, ResponseComplete
+      pilot_default: 1
+      frozen: null
+
+  ebpf:
+    description: eBPF probes (kernel-captured syscalls)
+    time_basis:
+      pilot_default: kernel_clock
+      frozen: null
+    epsilon_relative:
+      pilot_default: 0.002
+      frozen: null
+    epsilon_absolute_ms:
+      pilot_default: 20
+      frozen: null
+    cpu_clock_drift_per_core:
+      description: Observed TSC or ktime drift between cores
+      pilot_default: 1
+      frozen: null
+
+  context:
+    description: Cluster context (etcd, kube-apiserver watch)
+    time_basis:
+      pilot_default: system_clock
+      frozen: null
+    epsilon_relative:
+      pilot_default: 0.001
+      frozen: null
+    epsilon_absolute_ms:
+      pilot_default: 15
+      frozen: null
+    cache_age_ms:
+      description: Staleness of watched objects in local cache
+      pilot_default: 100
+      frozen: null
+
+# Declared artifacts: how world derives baselines and parameters
+# The correlator's finding-ordering slack A and receipt delay beta, as
+# truth uses them: a link with an end within A + beta of a declared gap is
+# UNOBSERVABLE, since the correlator cannot resolve distinctness there
+# (exp2-gaps-plan B0c). Equal to the frozen orchestrator values (D-21;
+# test_correlator_timing_matches_the_orchestrator); a change to either is a
+# rebuild.
+correlator_timing:
+  A_s: 10
+  beta_s: 8
+
+declared_artifacts:
+
+  pattern_set_p_a:
+    description: A1/A2 injection pattern set (from spec/artifacts/p_a.v0.yaml)
+    path: spec/artifacts/p_a.v0.yaml
+    version_symbol: P_A
+    usage:
+      - finding: A1
+        purpose: Pattern matching in request path/query/body
+      - finding: A2
+        purpose: Pattern-class classification for response indicators
+    frozen: false
+
+  response_indicators_i_a2:
+    description: A2 response indicator signatures (from spec/artifacts/i_a2.v0.yaml)
+    path: spec/artifacts/i_a2.v0.yaml
+    version_symbol: I_A2
+    usage:
+      - finding: A2
+        purpose: Response body/status classification per pattern class
+    frozen: false
+
+  resource_enumeration_baseline_b1:
+    description: |
+      B1 baseline: per-principal (api_group, resource, namespace) distinct-count
+      baseline built from pilot benign traffic in DEV pool.
+    symbol: S_B1
+    window_symbol: W_B1
+    threshold_symbol: Q_B1
+    fitted_on: DEV pool benign audit events
+    frozen: false
+
+  auth_failure_baseline_b2:
+    description: B2 baseline; 401 failure count threshold per observed source
+    window_symbol: W_B2
+    threshold_symbol: N_B2
+    fitted_on: DEV pool benign traffic
+    frozen: false
+
+  request_rate_baseline_b3:
+    description: B3 baseline; per-principal request rate in window W_B3
+    window_symbol: W_B3
+    threshold_symbol: Q_B3
+    fitted_on: DEV pool benign audit events
+    frozen: false
+
+  expected_token_readers_d1:
+    description: |
+      D1 expected-reader artifact: workloads expected to read their own
+      projected ServiceAccount token (e.g., legitimate client libraries).
+    symbol: E_D1
+    fitted_on: DEV pool benign syscall traces
+    frozen: false
+
+  expected_executable_writers_e2:
+    description: |
+      E2 expected-writer artifact: declared post-start executable or package
+      writes (e.g., build caches, package managers, compiled artifacts).
+    symbol: E_E2
+    fitted_on: DEV pool benign syscall traces
+    frozen: false
+
+  expected_privilege_transitions_f1:
+    description: |
+      F1 expected privilege transitions: declared setuid helpers and
+      privilege-drop patterns per workload.
+    symbol: E_F1
+    declared_per_workload: true
+    frozen: false
+
+  service_edge_baseline_g1a:
+    description: G1a service-edge baseline; part of versioned G baseline
+    symbol: Q_G1a
+    fitted_on: DEV pool benign network flows and audit
+    frozen: false
+
+  exec_join_window_g2:
+    description: G2 join window between accepted exec request and target exec
+    symbol: W_G2
+    measured_from: pilot exec start delay
+    frozen: false
+
+  egress_baseline_h1:
+    description: H1 egress interval and per-workload percentile baseline
+    symbol: W_H1
+    percentile_symbol: Q_H1
+    fitted_on: DEV pool benign network flows
+    frozen: false
+
+  external_destination_set_h2:
+    description: H2 per-workload external destination set (approved external IPs/domains)
+    symbol: Q_H2
+    fitted_on: DEV pool benign traffic
+    frozen: false
+
+  secret_enumeration_baseline_h3:
+    description: H3 secret list/get count threshold per principal in window W_H3
+    window_symbol: W_H3
+    threshold_symbol: N_H3
+    fitted_on: DEV pool benign audit events
+    frozen: false
+
+  sensitive_data_class_h4:
+    description: |
+      H4 declared sensitive-data class set (files that count as data access;
+      e.g., /etc/passwd, /var/secrets, application databases).
+      `paths` maps a file path to the data class the eBPF renderer writes on
+      every read of it (the "file identity -> C_H4" context join of rule H4);
+      a scenario's explicit data_class still wins. The detector's C_H4 lists
+      which classes count as sensitive (fit_params.py: credential, system).
+      v0 declares one list for all workloads. The projected service-account
+      token is not listed: token reads are D1's evidence, not data access.
+    symbol: C_H4
+    declared_per_workload: true
+    paths:
+      /etc/passwd: system
+      /etc/shadow: system
+      /app/config/application.yaml: application
+    frozen: false
+
+# Run metadata and provenance requirements
+run_context:
+  run_id:
+    description: Unique run identifier (UUID)
+    generated: true
+  split:
+    description: Dataset split classification
+    values:
+      - PILOT
+      - RESEARCH
+      - HELD_OUT
+  scenario_id:
+    description: Scenario catalogue entry ID
+    required: true
+  scenario_variant:
+    description: Variant index within the scenario
+    required: true
+  world_name:
+    description: Small, Reference, or Large
+    required: true
+  seed:
+    description: Determinism seed (stored in restricted/seeds/)
+    required: true
+    restricted: true
+  capture_profile:
+    description: Declared capture families (evaluated-v0 or research-superset-v0)
+    default: research-superset-v0
+  rule_evaluation_mode:
+    description: Emit all rule evaluations or only candidates
+    default: candidates
+
+# Nuisance check: maximum per-finding predictability from run metadata only
+nuisance_check:
+  description: |
+    Per-split check: train a predictor using only nuisance features (capture
+    profile, run duration, source presence, event volume, workload identity,
+    time position).  Each finding gets one verdict (decided 2026-11-01):
+    NOT_TESTABLE when PRESENT or ABSENT has fewer than min_windows_per_label
+    windows; FAIL when its AUC or balanced accuracy on left-out runs is at
+    least the threshold and its permutation p-value is below alpha (rule (b)
+    of the freeze proposal, section 3.3); PASS otherwise.  Feature set and
+    threshold are fixed here; values are pilot_default until the pilot freeze
+    (phase 7).
+  features:
+    - capture_profile
+    - run_duration
+    - source_presence
+    - event_volume
+    - workload_identity
+    - time_position
+  threshold:
+    description: |
+      Maximum AUC (or balanced accuracy when only one class appears in CV folds)
+      that the nuisance predictor may reach for any finding.  Exceeding this on
+      any finding causes the check to fail.
+    pilot_default: 0.65
+    frozen: null
+  cv_strategy: grouped_kfold_by_run
+  cv_n_splits:
+    pilot_default: 5
+    frozen: null
+  min_windows_per_label:
+    description: |
+      Fewest PRESENT and fewest ABSENT windows a finding needs before the
+      check can vouch for it.  The D3 target of 20 PRESENT per finding,
+      applied to the smaller label.
+    pilot_default: 20
+    frozen: null
+  significance:
+    description: |
+      Permutation test: labels are shuffled among the finding's windows and
+      the cross-validated score recomputed; p = (k + 1) / (permutations + 1),
+      k = shuffles scoring at least the observed score.
+    alpha: 0.05
+    permutations: 1000
+    seed: 0
+
+# Determinism and validation
+determinism:
+  base_stream_reproducible: true
+  base_stream_seed_source: run context seed + scenario ID + variant
+  truth_reproducible: true
+  truth_seed_dependent: true
+  manifest_reproducible: true
+  roundtrip_determinism:
+    description: Rebuild from manifest must produce byte-identical base stream and truth
+    required: true

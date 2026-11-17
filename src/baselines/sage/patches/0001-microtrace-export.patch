@@ -1,0 +1,205 @@
+diff --git a/ag_generation.py b/ag_generation.py
+index 2901a9a..6b94ec1 100644
+--- a/ag_generation.py
++++ b/ag_generation.py
+@@ -81,7 +81,8 @@ def _make_vertex_info(episode, in_main_model):
+     else:
+         state_id = '|Sink'
+     vert_name = cat + '|' + episode[4] + state_id
+-    vert_info = (vert_name, start_time, end_time, signs, timestamps)
++    alert_ids = episode[7] if len(episode) > 7 else []  # MicroTRACE: alert IDs (index 5)
++    vert_info = (vert_name, start_time, end_time, signs, timestamps, alert_ids)
+     return vert_info
+ 
+ 
+@@ -200,6 +201,7 @@ def make_attack_graphs(state_sequences, sev_sinks, datafile, dir_name, save_ag=T
+     @param dir_name: the name of the directory where the attack graphs should be saved
+     @param save_ag: whether to save the attack graphs (i.e. create dot, png and svg files with the attack graphs)
+     """
++    export = []  # MicroTRACE: attack-graph paths with alert IDs
+     tcols = {'t0': 'maroon', 't1': 'orange', 't2': 'darkgreen', 't3': 'blue', 't4': 'magenta',
+              't5': 'purple', 't6': 'brown', 't7': 'tomato', 't8': 'turquoise', 't9': 'skyblue'}
+ 
+@@ -251,10 +253,13 @@ def make_attack_graphs(state_sequences, sev_sinks, datafile, dir_name, save_ag=T
+             node_signatures = dict()
+             already_addressed = set()
+             for team_attacker, attempts in team_attack_attempts.items():  # For each attacker that obtains the objective
+-                color = tcols[team_attacker.split('-')[0]]  # Team color
++                color = tcols.get(team_attacker.split('-')[0], 'black')  # Team color (MicroTRACE: >10 teams)
+                 # _print_unique_attempts(team_attacker, attempts)
+ 
+                 for attempt in attempts:
++                    export.append({'victim': victim, 'objective': objective, 'attacker': team_attacker,
++                                   'episodes': [{'vertex': a[0], 'start': a[1], 'end': a[2],
++                                                 'alert_ids': sorted(a[5])} for a in attempt]})
+                     # Record signatures
+                     for action in attempt:  # action = (vert_name, start_time, end_time, signs, timestamps)
+                         if action[0] not in node_signatures.keys():
+@@ -292,7 +297,7 @@ def make_attack_graphs(state_sequences, sev_sinks, datafile, dir_name, save_ag=T
+ 
+                     # Create edges (transitions) for the AG
+                     bigram = zip(attempt, attempt[1:])  # Make bigrams (sliding window of 2)
+-                    for vid, ((vname1, time1, _, _, ts1), (vname2, _, _, _, ts2)) in enumerate(bigram):
++                    for vid, ((vname1, time1, _, _, ts1, *_), (vname2, _, _, _, ts2, *_)) in enumerate(bigram):
+                         edge_line = _create_edge_line(vid, vname1, vname2, ts1, ts2, color, team_attacker.split('-')[1])
+                         lines.append((time1, edge_line))
+ 
+@@ -322,5 +327,11 @@ def make_attack_graphs(state_sequences, sev_sinks, datafile, dir_name, save_ag=T
+                     for line in lines:
+                         outfile.write(str(line[1]) + '\n')
+ 
+-                os.system("dot -Tpng " + out_filepath + ".dot -o " + out_filepath + ".png")
+-                os.system("dot -Tsvg " + out_filepath + ".dot -o " + out_filepath + ".svg")
++                if not os.environ.get('SAGE_SKIP_RENDER'):
++                    os.system("dot -Tpng " + out_filepath + ".dot -o " + out_filepath + ".png")
++                    os.system("dot -Tsvg " + out_filepath + ".dot -o " + out_filepath + ".svg")
++
++    # MicroTRACE: every attack-graph path, with the alert IDs of each episode
++    import json
++    with open(datafile + '-paths.json', 'w') as fh:
++        json.dump(export, fh, indent=1, default=str)
+diff --git a/episode_sequence_generation.py b/episode_sequence_generation.py
+index c1c7478..c5d62dc 100644
+--- a/episode_sequence_generation.py
++++ b/episode_sequence_generation.py
+@@ -127,8 +127,12 @@ def _create_episode(hyperalert_seq_epi, mcat, team_start_time):
+     end_time = (last_ts - team_start_time).total_seconds()
+     period = end_time - start_time
+ 
++    # MicroTRACE: IDs of the alerts in this episode (index 9; the victim moves to index 10, still [-1])
++    alert_ids = [alert[5] for window in hyperalert_seq_epi for alert in window if alert[5] is not None]
++
+     # EPISODE DEF: (startTime, endTime, mcat, raw_events, volume(alerts), epiPeriod, epiServices, list of unique signatures, (1st timestamp, last timestamp)
+-    episode = (start_time, end_time, mcat, events, alert_volume, period, services, unique_signatures, (first_ts, last_ts))
++    episode = (start_time, end_time, mcat, events, alert_volume, period, services, unique_signatures, (first_ts, last_ts),
++               alert_ids)
+     return episode
+ 
+ 
+diff --git a/model_learning.py b/model_learning.py
+index 35ce916..1ae9638 100644
+--- a/model_learning.py
++++ b/model_learning.py
+@@ -204,7 +204,8 @@ def encode_sequences(dfa, sinks, subsequences):
+ 
+ 
+         # start_time, end_time, mcat, state_ID, mserv, list of unique signatures, (1st and last timestamp)
+-        state_subsequence = [(epi[0], epi[1], epi[2], state_trace[i][1], max_services[i], epi[7], epi[8])
++        state_subsequence = [(epi[0], epi[1], epi[2], state_trace[i][1], max_services[i], epi[7], epi[8],
++                              epi[9])  # MicroTRACE: alert IDs
+                              for i, epi in enumerate(episodes)]
+                              
+         parts = attacker.split('->')
+diff --git a/sage.py b/sage.py
+index f280c7b..0154c95 100644
+--- a/sage.py
++++ b/sage.py
+@@ -22,6 +22,10 @@ IANA_CSV_FILE = "https://www.iana.org/assignments/service-names-port-numbers/ser
+ IANA_NUM_RETRIES = 5
+ SAVE_AG = True
+ CPTC_BAD_IP = '169.254.169.254'
++EXTRA_SIGNATURES = {}  # MicroTRACE: {signature: MicroAttackStage name}
++if os.environ.get('SAGE_EXTRA_SIGNATURES'):
++    with open(os.environ['SAGE_EXTRA_SIGNATURES'], encoding='utf-8') as _fh:
++        EXTRA_SIGNATURES = json.load(_fh)
+ 
+ 
+ def _get_attack_stage_mapping(signature):
+@@ -32,7 +36,9 @@ def _get_attack_stage_mapping(signature):
+     @return: the inferred attack stage
+     """
+     result = MicroAttackStage.NON_MALICIOUS
+-    if signature in usual_mapping.keys():
++    if signature in EXTRA_SIGNATURES:  # MicroTRACE: finding type -> stage (frozen mapping)
++        result = MicroAttackStage[EXTRA_SIGNATURES[signature]]
++    elif signature in usual_mapping.keys():
+         result = usual_mapping[signature]
+     elif signature in unknown_mapping.keys():
+         result = unknown_mapping[signature]
+@@ -54,7 +60,11 @@ def load_iana_mapping():
+     @return: a dictionary that maps a port to the corresponding service based on the IANA mapping
+     """
+     # Perform the first request and in case of a failure retry the specified number of times
+-    for attempt in range(IANA_NUM_RETRIES + 1):
++    local_csv = os.environ.get('SAGE_IANA_CSV')  # MicroTRACE: pinned local copy
++    if local_csv:
++        with open(local_csv, encoding='utf-8') as fh:
++            content = fh.read()
++    for attempt in range(0 if local_csv else IANA_NUM_RETRIES + 1):
+         response = requests.get(IANA_CSV_FILE)
+         if response.ok:
+             content = response.content.decode("utf-8")
+@@ -149,7 +159,8 @@ def _parse(unparsed_data):
+             continue
+ 
+         mcat = _get_attack_stage_mapping(sig)
+-        parsed_data.append((diff_dt, src_ip, src_port, dst_ip, dst_port, sig, cat, host, dt, mcat))
++        alert_id = raw.get('microtrace_finding_id')  # MicroTRACE: alert ID for the path export
++        parsed_data.append((diff_dt, src_ip, src_port, dst_ip, dst_port, sig, cat, host, dt, mcat, alert_id))
+ 
+     print('Reading # alerts: ', len(parsed_data))
+     parsed_data = sorted(parsed_data, key=lambda al: al[8])  # Sort alerts into ascending order
+@@ -167,9 +178,9 @@ def _remove_duplicates(unfiltered_alerts, plot=False, gap=1.0):
+     @param gap: the filtering gap, i.e. alert filtering window (parameter `t` in the paper, default 1.0 sec)
+     @return: the alerts without duplicates
+     """
+-    filtered_alerts = [unfiltered_alerts[x] for x in range(1, len(unfiltered_alerts))
++    filtered_alerts = [unfiltered_alerts[x] for x in range(len(unfiltered_alerts))
+                        if unfiltered_alerts[x][9] != MicroAttackStage.NON_MALICIOUS.value  # Skip non-malicious alerts
+-                       and not (unfiltered_alerts[x][0] <= gap  # Diff from previous alert is less than gap sec
++                       and not (x > 0 and unfiltered_alerts[x][0] <= gap  # Diff from previous alert is less than gap sec
+                                 and unfiltered_alerts[x][1] == unfiltered_alerts[x - 1][1]  # Same srcIP
+                                 and unfiltered_alerts[x][3] == unfiltered_alerts[x - 1][3]  # Same destIP
+                                 and unfiltered_alerts[x][5] == unfiltered_alerts[x - 1][5]  # Same suricata category
+@@ -196,7 +207,7 @@ def load_data(path_to_alerts, filtering_window, start, end):
+     _team_alerts = []
+     _team_labels = []
+     _team_start_times = []  # Record the first alert just to get the real elapsed time (if the user filters (s,e) range)
+-    files = glob.glob(path_to_alerts + "/*.json")
++    files = sorted(glob.glob(path_to_alerts + "/*.json"))  # MicroTRACE: deterministic team IDs
+     print('About to read json files...')
+     if len(files) < 1:
+         print('No alert files found.')
+@@ -259,9 +270,9 @@ def group_alerts_per_team(alerts, port_mapping):
+                 host_alerts[(src_ip, dst_ip)] = []
+ 
+             if (src_ip, dst_ip) in host_alerts.keys():  # TODO: remove the redundant host names
+-                host_alerts[(src_ip, dst_ip)].append((dst_ip, mcat, ts, dst_port, signature))
++                host_alerts[(src_ip, dst_ip)].append((dst_ip, mcat, ts, dst_port, signature, alert[10]))
+             else:
+-                host_alerts[(dst_ip, src_ip)].append((src_ip, mcat, ts, dst_port, signature))
++                host_alerts[(dst_ip, src_ip)].append((src_ip, mcat, ts, dst_port, signature, alert[10]))
+ 
+         _team_data[tid] = host_alerts.items()
+     return _team_data
+@@ -296,7 +307,8 @@ port_services = load_iana_mapping()
+ 
+ print('------ Reading alerts ------')
+ team_alerts, team_labels, team_start_times = load_data(path_to_json_files, alert_filtering_window, start_hour, end_hour)
+-plot_histogram(team_alerts, team_labels, experiment_name)
++if not os.environ.get('SAGE_SKIP_RENDER'):  # MicroTRACE: batch runs skip figures
++    plot_histogram(team_alerts, team_labels, experiment_name)
+ team_data = group_alerts_per_team(team_alerts, port_services)
+ 
+ print('------ Converting to episodes ------')
+@@ -309,11 +321,19 @@ print('------ Breaking into sub-sequences and generating traces ------')
+ episode_subsequences = break_into_subbehaviors(host_data)
+ episode_traces = generate_traces(episode_subsequences, path_to_traces)
+ 
++# MicroTRACE: export the team labels and every episode subsequence with its alert IDs
++with open(experiment_name + '-teams.json', 'w') as fh:
++    json.dump(team_labels, fh, indent=1)
++with open(experiment_name + '-sequences.json', 'w') as fh:
++    json.dump({k: [{'start': e[0], 'end': e[1], 'mcat': e[2], 'alert_ids': sorted(e[9])} for e in v]
++               for k, v in sorted(episode_subsequences.items())}, fh, indent=1)
++
+ 
+ print('------ Learning S-PDFA ------')
+ flexfringe(path_to_traces, ini=path_to_ini, symbol_count="2", state_count="4")
+ 
+-os.system("dot -Tpng " + path_to_traces + ".ff.final.dot -o " + path_to_traces + ".png")
++if not os.environ.get('SAGE_SKIP_RENDER'):
++    os.system("dot -Tpng " + path_to_traces + ".ff.final.dot -o " + path_to_traces + ".png")
+ 
+ print('------ !! Special: Fixing syntax error in main model and sink files ------')
+ print('--- Sinks')

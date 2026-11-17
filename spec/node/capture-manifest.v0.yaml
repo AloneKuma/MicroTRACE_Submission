@@ -1,0 +1,453 @@
+# MicroTRACE node capture manifest, version capture-manifest.v0
+#
+# Status: DESIGN. Fixes the semantic meaning of each captured event family.
+# `candidate_probes` are proposals only: the working attachment points, kernel
+# and runtime support, and field availability are Gap 2 results
+# (spec/rules/gap2-tests.yaml). No universal syscall or packet capture.
+#
+# Record modes:
+#   individual - every event is exported as its own RawEbpfRecord; required
+#                for any direct witness or any side of a per-action join.
+#   counter    - per-flow, per-interval counters; allowed only where noted.
+# Every family is covered by sensor.loss counters (attempted/emitted/dropped
+# per family and interval). A dropped interval is an evidence gap, never
+# evidence of absence.
+manifest_version: capture-manifest.v0
+record_message: microtrace.v0.RawEbpfRecord
+
+common_fields:
+  # Present on every record of every family.
+  - microtrace.v0.RawEbpfRecord.node_id
+  - microtrace.v0.RawEbpfRecord.boot_id
+  - microtrace.v0.RawEbpfRecord.node_seq
+  - microtrace.v0.RawEbpfRecord.monotonic_ns
+  - microtrace.v0.RawEbpfRecord.capture_manifest_version
+  - microtrace.v0.RawEbpfRecord.event_family
+  - microtrace.v0.RawEbpfRecord.process
+  - microtrace.v0.RawEbpfRecord.parent
+  - microtrace.v0.RawEbpfRecord.lineage_root
+  - microtrace.v0.RawEbpfRecord.container
+  - microtrace.v0.RawEbpfRecord.reader_class
+  - microtrace.v0.RawEbpfRecord.result
+  - microtrace.v0.RawEbpfRecord.return_value
+
+identity_rules:
+  process_key: >-
+    (node_id, boot_id, tgid, start_time_ns). tgid alone is reused.
+  lineage_root: >-
+    First ancestor whose parent is outside the container cgroup (for a Pod
+    process), or the first ancestor below the node init process (host). An
+    exec session started through the runtime begins a new lineage.
+  pod_attribution: >-
+    Resolved by normalization from cgroup/container ID to Pod UID through the
+    time-indexed context history, only for an unambiguous interval; otherwise
+    JOIN_UNCERTAIN. A process with no Pod cgroup is reader_class
+    READER_HOST_PROCESS and is never assigned to the Pod that owns a file it reads.
+  time: >-
+    monotonic_ns converted by the versioned per-node clock model from
+    sensor.clock samples; node_seq orders events from one (node_id, boot_id).
+  sensor_self: >-
+    The sensor's own cgroup and process keys are declared at start; its
+    records carry caller_is_sensor where a family requires self-exclusion.
+
+families:
+  - id: proc.exec
+    operation: Successful execve/execveat that replaced a process image.
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.ExecDetail.filename
+      - microtrace.v0.ExecDetail.executable
+      - microtrace.v0.ExecDetail.argv_sha256
+      - microtrace.v0.ExecDetail.argv0
+      - microtrace.v0.ExecDetail.starts_new_lineage
+    object_identity: executable FileIdentity (dev, ino, mnt_ns_inum)
+    consumers: [C1b, E3, G2]
+    witnesses: [process-ancestry, host-transition]
+    candidate_probes: ["tracepoint sched:sched_process_exec", "LSM bprm_check_security (identity only)"]
+    gap2_tests: [NODE-EXEC-LINEAGE]
+
+  - id: proc.fork
+    operation: New task group created (fork/clone without CLONE_THREAD).
+    result_required: success
+    record_mode: individual
+    fields: []
+    object_identity: child ProcessKey in `process`, parent in `parent`
+    consumers: [C1b]
+    witnesses: [process-ancestry, host-transition]
+    candidate_probes: ["tracepoint sched:sched_process_fork"]
+    gap2_tests: [NODE-EXEC-LINEAGE]
+
+  - id: proc.exit
+    operation: Task group exit; closes the ProcessKey lifetime.
+    result_required: none
+    record_mode: individual
+    fields: []
+    object_identity: ProcessKey
+    consumers: []
+    witnesses: [process-ancestry]
+    candidate_probes: ["tracepoint sched:sched_process_exit"]
+    gap2_tests: [NODE-EXEC-LINEAGE]
+
+  - id: file.open
+    operation: open/openat/openat2 of a file; result and flags retained.
+    result_required: success_or_failure
+    record_mode: individual
+    selection: >-
+      Files in the projected-token index, files in the declared H4
+      sensitive-data class set, and container-runtime sockets opened as files.
+      Not every open on the node.
+    fields:
+      - microtrace.v0.FileAccessDetail.op
+      - microtrace.v0.FileAccessDetail.file
+      - microtrace.v0.FileAccessDetail.open_flags
+      - microtrace.v0.FileAccessDetail.fd
+      - microtrace.v0.FileIdentity.dev
+      - microtrace.v0.FileIdentity.ino
+      - microtrace.v0.FileIdentity.mnt_ns_inum
+      - microtrace.v0.FileIdentity.mnt_id
+      - microtrace.v0.FileIdentity.resolved_path
+      - microtrace.v0.FileIdentity.path_as_opened
+      - microtrace.v0.FileIdentity.projected
+    object_identity: FileIdentity (dev, ino) resolved from the opened file, not the path text
+    consumers: [D1, H4]
+    witnesses: [credential-read-to-use]
+    candidate_probes: ["LSM file_open", "tracepoint syscalls:sys_exit_openat"]
+    gap2_tests: [NODE-FILE-READ-SUCCESS, NODE-TOKEN-FILE-IDENTITY]
+
+  - id: file.read
+    operation: Successful read on an fd from a selected file.open (bytes > 0).
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.FileAccessDetail.op
+      - microtrace.v0.FileAccessDetail.file
+      - microtrace.v0.FileAccessDetail.fd
+      - microtrace.v0.FileAccessDetail.bytes
+      - microtrace.v0.FileIdentity.dev
+      - microtrace.v0.FileIdentity.ino
+      - microtrace.v0.FileIdentity.projected
+    object_identity: FileIdentity carried from the fd's open
+    consumers: [D1, H4, G1b]
+    witnesses: [credential-read-to-use, process-ancestry]
+    candidate_probes: ["fexit vfs_read (fd->file resolved)", "tracepoint syscalls:sys_exit_read + fd map"]
+    notes: >-
+      A successful open is not a read. D1 requires this family. mmap reads of
+      a selected file are an open gap (recorded as JOIN_UNCERTAIN if mapped).
+    gap2_tests: [NODE-FILE-READ-SUCCESS, NODE-TOKEN-FILE-IDENTITY, NODE-HOST-READER]
+
+  - id: file.mutation
+    operation: >-
+      Write, create with mode, chmod/fchmodat/fchmodat2, rename over a path,
+      unlink, or a shared writable mmap on a file in a container writable layer
+      or mounted volume.
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.FileMutationDetail.op
+      - microtrace.v0.FileMutationDetail.file
+      - microtrace.v0.FileMutationDetail.rename_target
+      - microtrace.v0.FileMutationDetail.new_mode
+      - microtrace.v0.FileMutationDetail.prior_mode
+      - microtrace.v0.FileMutationDetail.executable_after
+      - microtrace.v0.FileMutationDetail.bytes
+    object_identity: FileIdentity; E3 artifact identity is NOT selected (design-spec 5, 8.6)
+    consumers: [E2, E3]
+    witnesses: [process-ancestry]
+    candidate_probes: ["LSM path_chmod", "LSM inode_rename", "LSM file_permission (MAY_WRITE)", "LSM mmap_file (PROT_WRITE, MAP_SHARED)"]
+    notes: >-
+      Content written through a shared mapping is not observed; such a mapping
+      marks the file's continuity as JOIN_UNCERTAIN for E3.
+    gap2_tests: [NODE-EXEC-WRITE-VARIANTS, E3-ARTIFACT-IDENTITY]
+
+  - id: priv.creds
+    operation: Credential or capability change of a task (uid/euid/gid/caps).
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.PrivilegeDetail.op
+      - microtrace.v0.PrivilegeDetail.before
+      - microtrace.v0.PrivilegeDetail.after
+      - microtrace.v0.PrivilegeDetail.via_executable
+    object_identity: ProcessKey
+    consumers: [F1, C1a]
+    witnesses: []
+    candidate_probes: ["kprobe commit_creds", "LSM task_fix_setuid", "LSM capset"]
+    gap2_tests: [NODE-PRIV-TRANSITION]
+
+  - id: ns.change
+    operation: setns, unshare, or mount attempt or success, with namespace sets before and after.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.NamespaceDetail.op
+      - microtrace.v0.NamespaceDetail.clone_flags
+      - microtrace.v0.NamespaceDetail.before
+      - microtrace.v0.NamespaceDetail.after
+      - microtrace.v0.NamespaceDetail.host_reference
+      - microtrace.v0.NamespaceDetail.mount_source
+      - microtrace.v0.NamespaceDetail.mount_target
+    object_identity: ProcessKey plus nsfs inode numbers
+    consumers: [C1a, C1b]
+    witnesses: [host-transition]
+    candidate_probes: ["tracepoint syscalls:sys_enter_setns/sys_exit_setns", "tracepoint syscalls:sys_exit_unshare", "LSM sb_mount"]
+    gap2_tests: [NODE-NS-TRANSITION]
+
+  - id: ns.sample
+    operation: Namespace set sampled at exec so host-namespace execution is visible without a transition syscall.
+    result_required: none
+    record_mode: individual
+    fields:
+      - microtrace.v0.NamespaceDetail.after
+      - microtrace.v0.NamespaceDetail.host_reference
+    object_identity: ProcessKey
+    consumers: [C1b]
+    witnesses: [host-transition]
+    candidate_probes: ["read task nsproxy at sched_process_exec"]
+    gap2_tests: [NODE-NS-TRANSITION]
+
+  - id: ipc.runtime_socket
+    operation: connect() to a declared container-runtime or Docker socket path from a Pod process.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.SocketDetail.op
+      - microtrace.v0.SocketDetail.remote
+      - microtrace.v0.Endpoint.unix_path
+    object_identity: unix socket path plus FileIdentity when resolvable
+    consumers: [C1a]
+    witnesses: []
+    candidate_probes: ["LSM socket_connect (AF_UNIX)"]
+    gap2_tests: [NODE-NS-TRANSITION]
+
+  - id: proc.ptrace
+    operation: ptrace attach/seize/traceme request, with target process.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.PtraceDetail.request
+      - microtrace.v0.PtraceDetail.target
+    object_identity: tracer and target ProcessKey
+    consumers: [C2]
+    witnesses: []
+    candidate_probes: ["LSM ptrace_access_check", "tracepoint syscalls:sys_enter_ptrace"]
+    gap2_tests: [NODE-PTRACE]
+
+  - id: bpf.call
+    operation: bpf() syscall with command, excluding the declared sensor identity.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.BpfDetail.cmd
+      - microtrace.v0.BpfDetail.caller_is_sensor
+    object_identity: ProcessKey
+    consumers: [C1a]
+    witnesses: []
+    candidate_probes: ["LSM bpf", "tracepoint syscalls:sys_enter_bpf"]
+    gap2_tests: [NODE-BPF-SELF-EXCLUSION]
+
+  - id: net.connect
+    operation: TCP/UDP connect (or first send for UDP) from a process, with result.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.SocketDetail.op
+      - microtrace.v0.SocketDetail.local
+      - microtrace.v0.SocketDetail.remote
+      - microtrace.v0.SocketDetail.flow
+    object_identity: FlowId (node_id, boot_id, socket cookie)
+    consumers: [G1a, H2, H4, D2]
+    witnesses: [network-flow]
+    candidate_probes: ["LSM socket_connect", "tracepoint sock:inet_sock_set_state"]
+    gap2_tests: [NODE-SOCKET-FLOW, CRED-CALLER-ATTRIBUTION]
+
+  - id: net.accept
+    operation: Accepted inbound connection, with owning process.
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.SocketDetail.op
+      - microtrace.v0.SocketDetail.local
+      - microtrace.v0.SocketDetail.remote
+      - microtrace.v0.SocketDetail.flow
+    object_identity: FlowId
+    consumers: [G1c]
+    witnesses: [network-flow]
+    candidate_probes: ["fexit inet_csk_accept"]
+    gap2_tests: [NODE-SOCKET-FLOW]
+
+  - id: net.flow_bytes
+    operation: Bytes sent and received per flow per interval, owned by one process.
+    result_required: none
+    record_mode: counter
+    counter_allowed_for: [H1]
+    individual_use: >-
+      H4 uses a flow counter only as the transfer half of its join when the
+      flow belongs to the same lineage as the data read. H1 may aggregate
+      counters per workload interval. Counters never identify content.
+    fields:
+      - microtrace.v0.FlowCounter.flow
+      - microtrace.v0.FlowCounter.remote
+      - microtrace.v0.FlowCounter.bytes_out
+      - microtrace.v0.FlowCounter.bytes_in
+      - microtrace.v0.FlowCounter.interval_start_mono_ns
+      - microtrace.v0.FlowCounter.interval_end_mono_ns
+    object_identity: FlowId
+    consumers: [H1, H4]
+    witnesses: []
+    candidate_probes: ["fexit tcp_sendmsg/tcp_cleanup_rbuf keyed by socket cookie", "cgroup_skb egress counters"]
+    gap2_tests: [NODE-FLOW-COUNTERS]
+
+  - id: token.file_index
+    operation: >-
+      Host-side census of kubelet projected volumes: for each Pod projected
+      ServiceAccount token volume, resolve the "..data" symlink to its
+      timestamped version directory and record (dev, ino) of the token file.
+      No token bytes are read.
+    result_required: none
+    record_mode: individual
+    fields:
+      - microtrace.v0.ProjectedIndexEntry.version
+      - microtrace.v0.ProjectedIndexEntry.dev
+      - microtrace.v0.ProjectedIndexEntry.ino
+      - microtrace.v0.ProjectedIndexEntry.current
+      - microtrace.v0.ProjectedVersion.owner_pod_uid
+      - microtrace.v0.ProjectedVersion.volume_name
+      - microtrace.v0.ProjectedVersion.version_dir
+      - microtrace.v0.ProjectedVersion.file_name
+    object_identity: (dev, ino) -> ProjectedVersion
+    consumers: [D1]
+    witnesses: [credential-read-to-use]
+    candidate_probes: ["userspace inotify on kubelet pods dir", "LSM inode_symlink/path_rename on ..data"]
+    notes: >-
+      The kubelet atomic writer swaps "..data" to a new "..<timestamp>.<rand>"
+      directory on each update and refreshes a projected token when it is older
+      than 80% of its TTL or 24 hours. Old and new versions coexist briefly, so
+      (dev, ino) plus version_dir, not the path, identifies the file read.
+    gap2_tests: [NODE-TOKEN-FILE-IDENTITY, NODE-TOKEN-ROTATION, NODE-HOST-READER]
+
+  - id: token.jti_index
+    status: conditional
+    operation: >-
+      For each indexed token file version, briefly parse JWT claims (jti, exp)
+      in the privileged node agent and discard the token bytes. Raises the
+      node agent's trust requirement.
+    result_required: none
+    record_mode: individual
+    record_message: microtrace.v0.TokenFileVersion
+    fields:
+      - microtrace.v0.TokenFileVersion.owner_pod_uid
+      - microtrace.v0.TokenFileVersion.version_dir
+      - microtrace.v0.TokenFileVersion.dev
+      - microtrace.v0.TokenFileVersion.ino
+      - microtrace.v0.TokenFileVersion.jti
+      - microtrace.v0.TokenFileVersion.expiry_unix_s
+    object_identity: (dev, ino, version_dir) -> JTI
+    consumers: [G1b]
+    witnesses: [credential-read-to-use]
+    candidate_probes: ["userspace, on token.file_index change"]
+    gap2_tests: [CRED-JTI-VERSION-INDEX]
+
+  - id: sensor.loss
+    operation: Attempted, emitted, and dropped counts per family and interval, plus queue occupancy.
+    result_required: none
+    record_mode: counter
+    counter_allowed_for: [completeness]
+    fields:
+      - microtrace.v0.LossCounter.event_family
+      - microtrace.v0.LossCounter.queue
+      - microtrace.v0.LossCounter.attempted
+      - microtrace.v0.LossCounter.emitted
+      - microtrace.v0.LossCounter.dropped
+      - microtrace.v0.LossCounter.queue_occupancy_max
+    object_identity: (node_id, boot_id, family, interval)
+    consumers: [completeness]
+    witnesses: []
+    candidate_probes: ["per-CPU counters incremented on ring-buffer reserve failure and on each emit"]
+    gap2_tests: [NODE-LOSS-LOAD]
+
+  - id: sensor.clock
+    operation: Paired monotonic/realtime samples for the per-node clock model.
+    result_required: none
+    record_mode: individual
+    fields:
+      - microtrace.v0.ClockSample.monotonic_ns
+      - microtrace.v0.ClockSample.realtime_unix_ns
+      - microtrace.v0.ClockSample.sync_source
+      - microtrace.v0.ClockSample.reported_error_bound_ns
+    object_identity: (node_id, boot_id)
+    consumers: [completeness]
+    witnesses: []
+    candidate_probes: ["userspace clock_gettime pairs"]
+    gap2_tests: [NODE-CLOCK-MODEL]
+
+  # ---------------------------------------------------------------------
+  # research-superset-v0 only. Consumers are "research": no MicroTRACE rule
+  # reads these families, so the evaluated detector sees the same inputs in
+  # both profiles. They exist so later ML work is not limited to what the
+  # rules needed. Loss is counted per family like every other family.
+  - id: research.syscall_stream
+    profile: research-superset-v0
+    operation: Every syscall exit of a Pod-attributed process (number, return value, duration). Pointer arguments are not read.
+    result_required: none
+    record_mode: individual
+    fields:
+      - microtrace.v0.SyscallRecord.nr
+      - microtrace.v0.SyscallRecord.name
+      - microtrace.v0.SyscallRecord.ret
+      - microtrace.v0.SyscallRecord.duration_ns
+    object_identity: ProcessKey
+    consumers: [research]
+    witnesses: []
+    candidate_probes: ["tracepoint raw_syscalls:sys_exit filtered by Pod cgroup"]
+    gap2_tests: [NODE-LOSS-LOAD]
+
+  - id: research.file_all
+    profile: research-superset-v0
+    operation: Every open, successful read, and mutation by a Pod-attributed process, not only selected files.
+    result_required: success_or_failure
+    record_mode: individual
+    fields:
+      - microtrace.v0.FileAccessDetail.op
+      - microtrace.v0.FileAccessDetail.file
+      - microtrace.v0.FileAccessDetail.bytes
+      - microtrace.v0.FileMutationDetail.op
+      - microtrace.v0.FileMutationDetail.file
+    object_identity: FileIdentity
+    consumers: [research]
+    witnesses: []
+    candidate_probes: ["same probes as file.open/file.read/file.mutation without the selection filter"]
+    gap2_tests: [NODE-LOSS-LOAD]
+
+  - id: research.argv
+    profile: research-superset-v0
+    operation: Redacted argv text of each exec, written to the protected archive and referenced from ExecDetail. Never the environment.
+    result_required: success
+    record_mode: individual
+    fields:
+      - microtrace.v0.ExecDetail.argv_protected
+    object_identity: ProcessKey
+    consumers: [research]
+    witnesses: []
+    candidate_probes: ["read argv from the exec'd task at sched_process_exec; redact in userspace before archiving"]
+    gap2_tests: [NODE-EXEC-LINEAGE]
+
+profiles:
+  evaluated-v0:
+    description: Families MicroTRACE rules and witnesses read. The only profile whose overhead and loss are reported as MicroTRACE's.
+    families: [proc.exec, proc.fork, proc.exit, file.open, file.read, file.mutation, priv.creds, ns.change,
+               ns.sample, ipc.runtime_socket, proc.ptrace, bpf.call, net.connect, net.accept,
+               net.flow_bytes, token.file_index, sensor.loss, sensor.clock]
+    optional: [token.jti_index]
+  research-superset-v0:
+    description: >-
+      Superset used for PILOT, RESEARCH, and HELD_OUT data collection. Every
+      system under comparison, MicroTRACE included, consumes a projection of
+      the same capture. Its extra load is measured and reported separately.
+    extends: evaluated-v0
+    families: [research.syscall_stream, research.file_all, research.argv]
+
+queues:
+  kernel_to_agent: {bounded: true, on_full: drop_and_count, capacity_parameter: node_queue_capacity}
+  agent_to_transport: {bounded: true, on_full: drop_and_count, capacity_parameter: node_queue_capacity}
+  batching: {parameter: node_batch_bounds, rule: "batching never merges individual-mode records"}

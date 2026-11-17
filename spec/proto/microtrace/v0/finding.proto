@@ -1,0 +1,89 @@
+// MicroTRACE Gap 1 schema v0: agent findings (findings.v0).
+// Finding types and their rules are in spec/rules/rulebook.v0.yaml.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+
+// Tactic names follow ATT&CK v19.2. Absence of primary_tactic is the
+// first-class "unmapped" state.
+enum Tactic {
+  TACTIC_UNSPECIFIED = 0;
+  INITIAL_ACCESS = 1;
+  EXECUTION = 2;
+  PERSISTENCE = 3;
+  PRIVILEGE_ESCALATION = 4;
+  CREDENTIAL_ACCESS = 5;
+  DISCOVERY = 6;
+  LATERAL_MOVEMENT = 7;
+  EXFILTRATION = 8;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  INFO = 1;
+  LOW = 2;
+  MEDIUM = 3;
+  HIGH = 4;
+}
+
+// Which detection path produced the finding (design-spec, "ML-assisted
+// detection": OR with provenance). Types without a model are PREDICATE.
+enum DetectionPath {
+  DETECTION_PATH_UNSPECIFIED = 0;
+  PREDICATE = 1;
+  ML = 2;
+  BOTH = 3;
+}
+
+// State of the model path for an ML-enabled type (B1, B2, B3, G1a, H1).
+enum MlStatus {
+  ML_STATUS_UNSPECIFIED = 0;
+  // The type has no model path.
+  ML_NOT_APPLICABLE = 1;
+  // No-ML ablation: the model path is switched off.
+  ML_DISABLED = 2;
+  // The entity has too little training history (N_cold); score withheld.
+  ML_COLD_START = 3;
+  ML_SCORED = 4;
+}
+
+message Finding {
+  string finding_id = 1;
+  // Table I ID, e.g. "D1".
+  string finding_type = 2;
+  string finding_name = 3;
+  string agent_id = 4;
+  // Underlying-action identity; absent means dedup cannot be assumed.
+  optional string action_id = 5;
+  google.protobuf.Timestamp event_start = 6;
+  google.protobuf.Timestamp event_end = 7;
+  google.protobuf.Timestamp publish_time = 8;
+  optional Tactic primary_tactic = 9;
+  // Reporting only; never used in transition lookup.
+  repeated Tactic secondary_tactics = 10;
+  repeated EntityRef entities = 11;
+  repeated string input_event_ids = 12;
+  // Reported detector output; not presumed calibrated for link scoring.
+  double detector_confidence = 13;
+  Severity severity = 14;
+  string detector_version = 15;
+  // Absent only when the rule uses no baseline.
+  optional string baseline_version = 16;
+  // Frozen declared artifacts (expected readers/writers, pattern sets).
+  repeated string artifact_versions = 17;
+  repeated EvidenceRef evidence_refs = 18;
+  Completeness completeness = 19;
+  // Rule-declared emitted fields (rulebook `emits`), string-encoded.
+  map<string, string> attributes = 20;
+  string parameter_set_version = 21;
+  DetectionPath detection_path = 22;
+  // Isolation Forest score (larger is more anomalous); present only when
+  // ml_status is ML_SCORED. Never a witness and never used by the GO.
+  optional double anomaly_score = 23;
+  // Content hash of the model artifact that produced anomaly_score.
+  optional string model_version = 24;
+  MlStatus ml_status = 25;
+}

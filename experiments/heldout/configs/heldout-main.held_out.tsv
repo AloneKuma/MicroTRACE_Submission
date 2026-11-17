@@ -1,0 +1,17 @@
+# name	correlator	params	set	split	half	findings_from	sage_variant
+# HELD_OUT (PILOT-type): main row (filters B3 Isolation Forest, B1 one-class SVM, H1 kNN; user 2026-11-12),
+# side rows: the earlier frozen B3-only setting (go_mlB3) and rules-only; SAGE on the main row's findings
+# (SAGE t, w were fitted on rules-only FIT findings and refitted on the main row's FIT findings on 2026-11-13 with the same grid and rule: same values, so sage.v0 stays; it gets the same findings as the GO main row).
+# HELD_OUT-cases (Targeted-type, rules-only): Full and the five Exp. 2 ablations.
+# Exp. 1 telemetry ablations (decided 2026-11-15): main-row params, one of the four security sources
+# dropped and declared not shipped (column 7 drop:<SOURCE>); auxiliary sources kept. The "Agent X only"
+# rows and the KAIROS-comparison row are not passes: go_main's summary.json per_agent and host_steps.
+go_main	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out
+go_mlB3	go	src/params/frozen/pilot-multistep-fit.K10.mlB3.yaml	held_out	experiments/heldout/splits/held_out.json	held_out
+go_rules	go	src/params/frozen/pilot-multistep-fit.K10.yaml	held_out	experiments/heldout/splits/held_out.json	held_out
+sage_ag	sage	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	go_main	ag
+sage_seq	sage	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	go_main	seq
+go_no_ebpf	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	drop:EBPF
+go_no_gateway	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	drop:GATEWAY
+go_no_admission	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	drop:KYVERNO
+go_no_api_audit	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml	held_out	experiments/heldout/splits/held_out.json	held_out	drop:AUDIT

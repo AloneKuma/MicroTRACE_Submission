@@ -1,0 +1,11 @@
+# Roundtrip fault plan: transit loss (10 % of all records)
+# Stage: transit — the shipper drops after sequencing; receiver writes DROPPED_BEFORE.
+# Selector: all topics, all sources.
+# Expected reconcile: received + dropped == base; every drop has a gap record.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: transit-loss-10pct
+    kind: loss
+    stage: transit
+    rate: 0.10

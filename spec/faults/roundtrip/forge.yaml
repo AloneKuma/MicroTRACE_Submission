@@ -1,0 +1,17 @@
+# Roundtrip fault plan: forge (fabricated network-connect records)
+# Stage: source — after t=15 min, insert 3 fabricated copies of the first
+# matching net.connect eBPF record.  The copies carry new logical_ids.
+# Expected reconcile: forged records appear in the archive but not the base
+# stream; they are excluded from the "extra" check because they appear in the
+# source fault log with action=forged.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: forged-net-connects
+    kind: forge
+    stage: source
+    after: "2024-01-01T00:15:00Z"
+    count: 3
+    select:
+      sources: [EBPF]
+      event_families: [net.connect]

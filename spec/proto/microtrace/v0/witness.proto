@@ -1,0 +1,105 @@
+// MicroTRACE Gap 1 schema v0: orchestrator witness decisions (witness.decisions.v0).
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+
+enum WitnessType {
+  WITNESS_TYPE_UNSPECIFIED = 0;
+  // Direct continuity types.
+  NETWORK_FLOW = 1;
+  REQUEST_IDENTITY = 2;
+  CREDENTIAL_READ_TO_USE = 3;
+  PROCESS_ANCESTRY = 4;
+  HOST_TRANSITION = 5;
+  ADMISSION_INSTANCE = 6;
+  CONTROL_PLANE_CAUSALITY_INSTANCE = 7;
+  // Host-level finding on node N joined to an off-node finding attributed to
+  // N's host network context; conditional on placement (design-spec.md).
+  HOST_CONTEXT = 8;
+  // Enabling-context types; never confirm a link.
+  CONTROL_PLANE_CAUSALITY_CLASS = 20;
+  IMAGE_CLASS = 21;
+}
+
+enum WitnessClass {
+  WITNESS_CLASS_UNSPECIFIED = 0;
+  DIRECT = 1;
+  ENABLING = 2;
+}
+
+enum DirectionBasis {
+  DIRECTION_BASIS_UNSPECIFIED = 0;
+  // Direction follows from the evidence itself (read before write in one
+  // node sequence, connect before accept, grant before use).
+  EVIDENCE_ORDER = 1;
+  // Removed: event-time order alone never sets direction (design-spec 2).
+  reserved 2;
+  reserved "EVENT_TIME_BEYOND_UNCERTAINTY";
+}
+
+enum WitnessStatus {
+  WITNESS_STATUS_UNSPECIFIED = 0;
+  CONFIRMED = 1;
+  ENABLING_ONLY = 2;
+  REJECTED = 3;
+  UNPROVEN = 4;
+  // Every admissible witness rests on degraded evidence: shown, never
+  // counted as confirmed (design-spec 5).
+  POST_COMPROMISE = 5;
+}
+
+// One join-key component and who can set it. A CONFIRMED witness needs at
+// least one SENSOR component from evidence that is not degraded.
+message KeyPartOrigin {
+  string component = 1;
+  KeyOrigin origin = 2;
+  // Evidence from a node after its compromise epoch (node-trust epoch).
+  bool degraded = 3;
+  repeated string evidence_event_ids = 4;
+}
+
+// For one source able to carry a decisive contradiction for this witness
+// type: whether loss, idleness or a node-trust epoch overlaps the witness
+// interval. Any overlap makes the witness UNPROVEN.
+message ContradictionCoverage {
+  Source source = 1;
+  bool loss_overlap = 2;
+  bool idle_overlap = 3;
+  bool epoch_overlap = 4;
+}
+
+message Contradiction {
+  string contradiction_id = 1;
+  bool decisive = 2;
+  string detail = 3;
+  repeated string evidence_event_ids = 4;
+  // decisive may be true only when origin is SENSOR and degraded is false.
+  KeyOrigin origin = 5;
+  bool degraded = 6;
+}
+
+message Witness {
+  string witness_id = 1;
+  string source_finding_id = 2;
+  string target_finding_id = 3;
+  WitnessType relationship_type = 4;
+  WitnessClass strength_class = 5;
+  // Typed instance key for DIRECT; class/context key for ENABLING.
+  string join_key_type = 6;
+  string join_key = 7;
+  DirectionBasis direction_basis = 8;
+  google.protobuf.Timestamp source_event_time = 9;
+  google.protobuf.Timestamp target_event_time = 10;
+  // W_w for this witness type and T. (The tactic-pair window W_ab was removed.)
+  repeated AppliedLimit applied_limits = 11;
+  uint64 clock_uncertainty_ns = 12;
+  repeated Contradiction contradictions = 13;
+  repeated string evidence_event_ids = 14;
+  WitnessStatus status = 15;
+  string decision_version = 16;
+  repeated KeyPartOrigin key_origin = 17;
+  repeated ContradictionCoverage contradiction_coverage = 18;
+}

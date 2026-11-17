@@ -1,0 +1,31 @@
+2026-11-17T09:33:33Z START sage scaling job, code 17baba0
+2026-11-17T09:35:12Z START 32 cpu, 123 GB, m7i.8xlarge, code 17baba0, workers 8, configs /home/ubuntu/sage-scaling.tsv (0a35ea274eca), clock 2026-11-17T09:33:29Z ptp0='ena-ptp-00' Reference ID : 50484330 (PHC0) System time : 0.000000027 seconds slow of NTP time
+2026-11-17T09:35:14Z SEAL ok: truth not readable here (AccessDenied)
+OK 328 runs match /home/ubuntu/code/experiments/heldout/manifests/held_out.tsv
+2026-11-17T09:49:04Z DATA held_out 328 runs, 105G
+2026-11-17T09:49:05Z RUN sage_s41_r1: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:49:29Z DONE sage_s41_r1 exit 0 in 23.2s
+2026-11-17T09:49:31Z RUN sage_s41_r2: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:49:55Z DONE sage_s41_r2 exit 0 in 23.7s
+2026-11-17T09:49:57Z RUN sage_s41_r3: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:50:20Z DONE sage_s41_r3 exit 0 in 22.4s
+2026-11-17T09:50:22Z RUN sage_s82_r1: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:51:05Z DONE sage_s82_r1 exit 0 in 42.3s
+2026-11-17T09:51:07Z RUN sage_s82_r2: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:51:50Z DONE sage_s82_r2 exit 0 in 42.7s
+2026-11-17T09:51:54Z RUN sage_s82_r3: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:52:37Z DONE sage_s82_r3 exit 0 in 43.5s
+2026-11-17T09:52:40Z RUN sage_s164_r1: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:54:05Z DONE sage_s164_r1 exit 0 in 85.0s
+2026-11-17T09:54:09Z RUN sage_s164_r2: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:55:33Z DONE sage_s164_r2 exit 0 in 83.7s
+2026-11-17T09:55:36Z RUN sage_s164_r3: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:57:00Z DONE sage_s164_r3 exit 0 in 83.3s
+2026-11-17T09:57:03Z RUN sage_s328_r1: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T09:59:49Z DONE sage_s328_r1 exit 0 in 165.8s
+2026-11-17T09:59:54Z RUN sage_s328_r2: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T10:02:48Z DONE sage_s328_r2 exit 0 in 173.5s
+2026-11-17T10:02:52Z RUN sage_s328_r3: sage src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml on held_out (held_out) 
+2026-11-17T10:05:37Z DONE sage_s328_r3 exit 0 in 164.7s
+2026-11-17T10:05:42Z ALL_DONE
+2026-11-17T10:05:46Z SHUTDOWN after final copy

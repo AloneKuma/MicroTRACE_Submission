@@ -1,0 +1,8 @@
+# PROPOSED (worklog section 4, P-1): event loss, 20 % of every record, source stage.
+version: faultplan.v0
+seed: 3202
+faults:
+  - id: loss-source-20
+    kind: loss
+    stage: source
+    rate: 0.2

@@ -1,0 +1,400 @@
+# MicroTRACE scenario action vocabulary, version actions.v0
+#
+# Status: DESIGN
+#
+# Each action defines:
+# - name and parameters
+# - world state it reads and changes
+# - record families (source types) it produces
+# - whether the action can fail
+#
+# Actions are invoked by scenario steps; outcomes (success/attempt_failed) are
+# determined by the scenario engine or explicitly set by the scenario author.
+
+version: actions.v0
+status: draft
+
+actions:
+  # ========== HTTP Gateway Actions ==========
+
+  - id: http_request
+    name: HTTP request to a gateway-visible endpoint
+    parameters:
+      - {name: source_pod, type: pod_uid, required: true}
+      - {name: target_service, type: service_name, required: true}
+      - {name: method, type: string, required: true, description: "GET, POST, etc."}
+      - {name: path, type: string, required: true}
+      - {name: query_params, type: string, required: false}
+      - {name: headers, type: map, required: false}
+      - {name: body_prefix_b64, type: string, required: false, description: "base64-encoded request body prefix"}
+      - {name: response_status, type: integer, required: false, description: "HTTP status returned (default 200)"}
+      - {name: observer_loss, type: bool, required: false, description: "gateway observer lost the response (default false)"}
+      - {name: listener, type: string, required: false, description: "gateway listener: edge (default; mints the request ID, origin SENSOR) or internal (keeps a client-supplied x-request-id, origin WORKLOAD)"}
+      - {name: copy_request_id_of, type: string, required: false, description: "\"@step<N>.action_seq\": send the request ID step N's request carried as this request's x-request-id (internal listener)"}
+    reads: [Pod IP, Service ClusterIP, target container port]
+    writes: [none]
+    produces_records: [gateway.observation]
+    can_fail: false
+    description: Send an HTTP request from a source Pod to a target service endpoint.
+
+  - id: api_request
+    name: Kubernetes API request from a principal
+    parameters:
+      - {name: principal, type: service_account | user | external_ip, required: true}
+      - {name: verb, type: string, required: true, description: "get, list, create, patch, delete, etc."}
+      - {name: api_group, type: string, required: true, description: "empty string for core API"}
+      - {name: resource, type: string, required: true}
+      - {name: namespace, type: string, required: false}
+      - {name: name, type: string, required: false}
+      - {name: body, type: object, required: false}
+    reads: [RBAC rules, object state, token validity]
+    writes: [objects (on create/patch/delete)]
+    produces_records: [audit.event]
+    can_fail: true
+    description: Perform an API operation authenticated by a principal.
+
+  - id: api_auth_failure
+    name: Failed authentication or authorization at the API server
+    parameters:
+      - {name: source_ip, type: ipv4_address, required: true}
+      - {name: verb, type: string, required: true}
+      - {name: api_group, type: string, required: true}
+      - {name: resource, type: string, required: true}
+      - {name: reason, type: string, required: false, enum: [unauthenticated, unauthorized]}
+    reads: [RBAC rules, source IP identity]
+    writes: [none]
+    produces_records: [audit.event]
+    can_fail: false
+    description: Record an authentication or authorization denial at the API server.
+
+  - id: secret_list
+    name: List secrets in a namespace (via audit-visible API call)
+    parameters:
+      - {name: principal, type: service_account | user, required: true}
+      - {name: namespace, type: string, required: true}
+    reads: [secrets in namespace, RBAC rules]
+    writes: [none]
+    produces_records: [audit.event]
+    can_fail: true
+    description: List all secrets in a namespace via Kubernetes API.
+
+  - id: secret_get
+    name: Get a specific secret (via audit-visible API call)
+    parameters:
+      - {name: principal, type: service_account | user, required: true}
+      - {name: namespace, type: string, required: true}
+      - {name: name, type: string, required: true}
+    reads: [secret, RBAC rules]
+    writes: [none]
+    produces_records: [audit.event]
+    can_fail: true
+    description: Get a specific secret via Kubernetes API.
+
+  # ========== Token and Credential Actions ==========
+
+  - id: read_token_file
+    name: Read a ServiceAccount token file
+    parameters:
+      - {name: reader_process, type: process_key, required: true}
+      - {name: token_file_path, type: string, required: true, description: "/var/run/secrets/kubernetes.io/serviceaccount/token"}
+      - {name: bytes_to_read, type: integer, required: false}
+      - {name: reader_executable, type: string, required: false, description: "executable the reader runs (default: the process's own)"}
+    reads: [projected token file (dev, ino)]
+    writes: [none]
+    produces_records: [ebpf.file.read]
+    can_fail: false
+    description: A process reads a ServiceAccount token file.
+
+  - id: read_sensitive_file
+    name: Read a sensitive file (e.g., /etc/passwd, database credentials)
+    parameters:
+      - {name: reader_process, type: process_key, required: true}
+      - {name: file_path, type: string, required: true}
+      - {name: bytes_to_read, type: integer, required: false}
+      - {name: data_class, type: string, required: false, enum: [credential, config, system, unknown]}
+    reads: [file (dev, ino)]
+    writes: [none]
+    produces_records: [ebpf.file.read]
+    can_fail: false
+    description: A process reads a sensitive file from the filesystem.
+
+  # ========== Process and Execution Actions ==========
+
+  - id: shell_exec
+    name: Execute a command via shell (sh -c)
+    parameters:
+      - {name: parent_process, type: process_key, required: true}
+      - {name: shell_binary, type: string, required: true, description: "/bin/sh or /bin/bash"}
+      - {name: command, type: string, required: true, description: "command string passed to -c"}
+    reads: [parent process state, shell binary]
+    writes: [new process created]
+    produces_records: [ebpf.proc.exec, ebpf.proc.fork]
+    can_fail: false
+    description: Execute a command string via a shell.
+
+  - id: process_exec
+    name: Execute a process or binary
+    parameters:
+      - {name: parent_process, type: process_key, required: true}
+      - {name: executable, type: string, required: true, description: "binary path"}
+      - {name: argv, type: list, required: true}
+      - {name: env, type: map, required: false}
+    reads: [parent process state, executable file (dev, ino)]
+    writes: [new process created]
+    produces_records: [ebpf.proc.exec, ebpf.proc.fork]
+    can_fail: false
+    description: Execute a process with explicit executable and arguments.
+
+  - id: ptrace_attach
+    name: Issue ptrace request to attach to a process
+    parameters:
+      - {name: attaching_process, type: process_key, required: true}
+      - {name: target_process, type: process_key, required: true}
+      - {name: request_type, type: string, required: true, enum: [PTRACE_ATTACH, PTRACE_SEIZE]}
+    reads: [target process state]
+    writes: [ptrace relationship]
+    produces_records: [ebpf.proc.ptrace]
+    can_fail: true
+    description: Issue a ptrace attach or seize request.
+
+  # ========== File Operations ==========
+
+  - id: file_write
+    name: Write or create a file
+    parameters:
+      - {name: writer_process, type: process_key, required: true}
+      - {name: file_path, type: string, required: true}
+      - {name: data, type: string | bytes, required: false}
+      - {name: create_if_missing, type: boolean, required: false}
+    reads: [file or parent directory]
+    writes: [file (dev, ino, content)]
+    produces_records: [ebpf.file.write, ebpf.file.mutation]
+    can_fail: false
+    description: Write data to a file or create a new file.
+
+  - id: make_executable
+    name: Change file permissions to make it executable
+    parameters:
+      - {name: process, type: process_key, required: true}
+      - {name: file_path, type: string, required: true}
+      - {name: mode, type: string, required: false, description: "chmod argument, e.g., +x or 0755"}
+    reads: [file (dev, ino)]
+    writes: [file permissions]
+    produces_records: [ebpf.file.mutation]
+    can_fail: false
+    description: Change file permissions to mark it executable.
+
+  - id: chmod
+    name: Change file mode/permissions
+    parameters:
+      - {name: process, type: process_key, required: true}
+      - {name: file_path, type: string, required: true}
+      - {name: mode, type: string, required: true}
+    reads: [file (dev, ino)]
+    writes: [file permissions]
+    produces_records: [ebpf.file.mutation]
+    can_fail: false
+    description: Change file permissions.
+
+  # ========== Privilege and Namespace Actions ==========
+
+  - id: privilege_change
+    name: Change effective UID or capabilities
+    parameters:
+      - {name: process, type: process_key, required: true}
+      - {name: target_euid, type: integer, required: false}
+      - {name: target_egid, type: integer, required: false}
+      - {name: caps_to_gain, type: list, required: false, description: "capability names"}
+    reads: [process credentials]
+    writes: [process euid/egid/capabilities]
+    produces_records: [ebpf.priv.creds]
+    can_fail: true
+    description: Change effective UID, GID, or capabilities.
+
+  - id: euid_to_root
+    name: Elevate effective UID to 0 (root)
+    parameters:
+      - {name: process, type: process_key, required: true}
+    reads: [process credentials]
+    writes: [process euid = 0]
+    produces_records: [ebpf.priv.creds]
+    can_fail: true
+    description: Change process effective UID to 0.
+
+  - id: namespace_escape
+    name: Escape from container namespace (setns or unshare)
+    parameters:
+      - {name: process, type: process_key, required: true}
+      - {name: target_namespaces, type: list, required: true, enum: [mnt, pid, net, user, ipc], description: "which namespaces to transition"}
+      - {name: method, type: string, required: true, enum: [setns, unshare]}
+      - {name: target_ns_inum, type: integer, required: false, description: "for setns, target inode number"}
+    reads: [process current namespaces]
+    writes: [process namespaces]
+    produces_records: [ebpf.ns.change]
+    can_fail: true
+    description: Escape from container namespace via setns or unshare.
+
+  - id: capability_gain
+    name: Gain additional capabilities
+    parameters:
+      - {name: process, type: process_key, required: true}
+      - {name: caps, type: list, required: true, description: "capability names to gain"}
+    reads: [process capabilities]
+    writes: [process capabilities]
+    produces_records: [ebpf.priv.creds]
+    can_fail: true
+    description: Add capabilities to a process.
+
+  # ========== Network Actions ==========
+
+  - id: connect_external
+    name: Outbound TCP/UDP connection to external destination
+    parameters:
+      - {name: source_pod, type: pod_uid, required: true}
+      - {name: source_process, type: process_key, required: true}
+      - {name: remote_ip, type: ipv4_address | ipv6_address, required: true}
+      - {name: remote_port, type: integer, required: true}
+      - {name: protocol, type: string, required: true, enum: [tcp, udp]}
+    reads: [source Pod IP, source process]
+    writes: [network flow state]
+    produces_records: [ebpf.net.connect, ebpf.net.flow_bytes]
+    can_fail: true
+    description: Establish or attempt an outbound connection to an external IP.
+
+  - id: connect_internal
+    name: Intra-cluster connection (Pod-to-Pod or Pod-to-Service)
+    parameters:
+      - {name: source_pod, type: pod_uid, required: true}
+      - {name: target_service_or_pod, type: service_name | pod_uid, required: true}
+      - {name: target_port, type: integer, required: true}
+      - {name: protocol, type: string, required: true, enum: [tcp, udp]}
+      - {name: source_port, type: integer, required: false, description: "fixed source port (bind before connect); a new socket may reuse it once the previous one closed (G2). Default: an ephemeral port"}
+    reads: [source Pod IP, target service/Pod IP]
+    writes: [network flow state]
+    produces_records: [ebpf.net.connect, ebpf.net.flow_bytes]
+    can_fail: true
+    description: Establish an intra-cluster connection to a service or Pod.
+
+  - id: accept_internal
+    name: Server accepts an intra-cluster connection
+    parameters:
+      - {name: server_pod, type: pod_uid, required: true, description: "the Pod the connect reached"}
+      - {name: accept_of, type: string, required: true, description: "the connect step's action_seq (\"@step<N>.action_seq\")"}
+      - {name: source_pod, type: pod_uid, required: false, description: "the client (ground-truth target only)"}
+    reads: [connection 4-tuple]
+    writes: [process table (handler process)]
+    produces_records: [ebpf.proc.fork, ebpf.net.accept]
+    can_fail: false
+    description: >-
+      The server Pod's main process forks a handler, which accepts the
+      connection (SocketOp ACCEPT, server side of the 4-tuple, Pod IP). Under
+      the generator flag ebpf_accept, every in-cluster connect to a Pod gets
+      one (G1); a scenario step of this action accepts its own connect.
+
+  - id: egress_transfer
+    name: Transfer bytes out of a Pod (volume-aware)
+    parameters:
+      - {name: source_pod, type: pod_uid, required: true}
+      - {name: destination, type: ipv4_address, required: false, description: "external destination; one of destination or target_pod"}
+      - {name: target_pod, type: pod_uid, required: false, description: "in-cluster destination Pod"}
+      - {name: bytes_out, type: integer, required: true}
+      - {name: protocol, type: string, required: true, enum: [tcp, udp]}
+    reads: [flow state, Pod context]
+    writes: [flow counter state]
+    produces_records: [ebpf.net.flow_bytes]
+    can_fail: false
+    description: Record bytes transferred out of a Pod to a destination.
+
+  # ========== Control Plane and Admission Actions ==========
+
+  - id: admit_pod
+    name: Admit a Pod via Kyverno or admission controller
+    parameters:
+      - {name: resource_uid, type: string, required: true, description: "Pod UID if generated"}
+      - {name: pod_name, type: string, required: true}
+      - {name: namespace, type: string, required: true}
+      - {name: image_digest, type: string, required: false}
+      - {name: policy_verdict, type: string, required: true, enum: [PASS, FAIL]}
+      - {name: policy_enforcement, type: string, required: true, enum: [enforce, audit]}
+    reads: [Pod spec, image signatures, policies]
+    writes: [admission decision]
+    produces_records: [kyverno.admission]
+    can_fail: false
+    description: Admit or reject a Pod creation request.
+
+  - id: rbac_change
+    name: Mutate an RBAC rule, role, or binding
+    parameters:
+      - {name: principal, type: service_account | user, required: true}
+      - {name: object_type, type: string, required: true, enum: [Role, ClusterRole, RoleBinding, ClusterRoleBinding]}
+      - {name: namespace, type: string, required: false}
+      - {name: name, type: string, required: true}
+      - {name: mutation_type, type: string, required: true, enum: [create, patch, delete, update]}
+      - {name: rules, type: list, required: false, description: "rules or subjects affected"}
+    reads: [existing RBAC objects]
+    writes: [RBAC object (UID, resourceVersion)]
+    produces_records: [audit.event]
+    can_fail: true
+    description: Create, patch, or delete an RBAC object (Role, RoleBinding, etc.).
+
+  - id: capability_privilege_annotation
+    name: Request capability or privilege via annotation or pod spec
+    parameters:
+      - {name: pod_name, type: string, required: true}
+      - {name: namespace, type: string, required: true}
+      - {name: cap_requested, type: string, required: false}
+      - {name: privileged, type: boolean, required: false}
+    reads: [Pod spec, security policies]
+    writes: [Pod annotation or spec]
+    produces_records: [audit.event, kyverno.admission]
+    can_fail: true
+    description: Request elevated privileges in a Pod spec (for admission testing).
+
+  # ========== Supporting / Measurement Actions ==========
+
+  - id: observe_state
+    name: Record a world state observation (for finding setup)
+    parameters:
+      - {name: entity_type, type: string, required: true, enum: [process, file, pod, network_flow]}
+      - {name: entity_id, type: string, required: true}
+      - {name: state_snapshot, type: object, required: true}
+    reads: [entity current state]
+    writes: [none]
+    produces_records: [none]
+    can_fail: false
+    description: Record current world state without modifying anything (used for finding expectations and baselines).
+
+  - id: delay
+    name: Introduce a time delay
+    parameters:
+      - {name: duration_seconds, type: number, required: true}
+    reads: [none]
+    writes: [none]
+    produces_records: [none]
+    can_fail: false
+    description: Delay execution for a specified duration (used between related steps).
+
+  - id: set_baseline
+    name: Set a baseline for a principal or workload
+    parameters:
+      - {name: principal, type: string, required: false}
+      - {name: workload, type: string, required: false}
+      - {name: baseline_type, type: string, required: true, enum: [service_edges, resource_access, request_rate, destinations, readers]}
+      - {name: baseline_value, type: object, required: true}
+    reads: [none]
+    writes: [baseline state in world]
+    produces_records: [none]
+    can_fail: false
+    description: Establish a baseline for anomaly detection (internal generator action).
+
+  - id: expect_finding
+    name: Mark that a step should trigger a finding (for scenario definition)
+    parameters:
+      - {name: finding_id, type: string, required: true, description: "A1, B2, H4, etc."}
+      - {name: state, type: string, required: true, enum: [PRESENT, ABSENT, UNOBSERVABLE]}
+      - {name: reason, type: string, required: false}
+    reads: [none]
+    writes: [none]
+    produces_records: [none]
+    can_fail: false
+    description: Declare that a scenario step is expected to produce or not produce a finding.

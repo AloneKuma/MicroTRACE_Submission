@@ -1,0 +1,296 @@
+# MicroTRACE topic contract, version topics.v0 (design draft).
+# Key byte encoding, logical IDs, retention, and replay rules are in
+# kafka-contract.md. Topic names carry the key/schema generation (".v0"); a
+# key or partition-count change creates a new topic generation through a
+# versioned restream, never an in-place change during an evaluated run.
+contract_version: topics.v0
+
+# Which producer writes each source message. The traceability generator uses
+# this to name the producer of every schema field.
+message_producers:
+  microtrace.v0.RawEbpfRecord: node-sensor
+  microtrace.v0.TokenFileVersion: node-sensor (conditional token.jti_index)
+  microtrace.v0.AuditEvent: audit-collector
+  microtrace.v0.GatewayObservation: gateway-observer
+  microtrace.v0.AdmissionDecision: kyverno-exporter
+  microtrace.v0.ObjectObservation: context-collector
+  microtrace.v0.DbAuditRecord: db-audit-collector
+  microtrace.v0.PathFlowRecord: path-flow-collector
+  microtrace.v0.WatchGap: context-collector
+  microtrace.v0.NormalizedEvent: normalizer
+  microtrace.v0.AuditDerived: normalizer
+  microtrace.v0.EbpfDerived: normalizer
+  microtrace.v0.OffNodeDerived: normalizer
+  microtrace.v0.Finding: agents
+  microtrace.v0.Witness: orchestrator
+  microtrace.v0.Incident: orchestrator
+  microtrace.v0.GroundTruthAction: scenario-harness
+  microtrace.v0.RuleEvaluation: agents
+
+topics:
+  - name: raw.ebpf.v0
+    producer: node-sensor
+    kinds: [RAW_EBPF, TOKEN_FILE_VERSION, HEARTBEAT]
+    key_type: KEY_NODE
+    key_components: [NODE_ID]
+    consumers: [normalizer, credential-join]
+    retention: R_raw
+    order_note: One node's records share a partition; node_seq is authoritative within (node_id, boot_id).
+  - name: raw.audit.v0
+    producer: audit-collector
+    kinds: [RAW_AUDIT, HEARTBEAT]
+    key_type: KEY_AUDIT_ID
+    key_components: [AUDIT_ID]
+    consumers: [normalizer]
+    retention: R_raw
+    order_note: Stages of one request co-locate; request order across partitions uses event time only.
+  - name: raw.gateway.v0
+    producer: gateway-observer
+    kinds: [RAW_GATEWAY, HEARTBEAT]
+    key_type: KEY_REQUEST_ID
+    key_components: [REQUEST_ID]
+    consumers: [normalizer]
+    retention: R_raw
+  - name: raw.kyverno.v0
+    producer: kyverno-exporter
+    kinds: [RAW_KYVERNO, HEARTBEAT]
+    key_type: KEY_ADMISSION
+    key_components: [ADMISSION_UID]
+    consumers: [normalizer]
+    retention: R_raw
+  - name: raw.dbaudit.v0
+    producer: db-audit-collector
+    kinds: [RAW_DB_AUDIT, HEARTBEAT]
+    key_type: KEY_SOURCE_ADDRESS
+    key_components: [SOURCE_ADDRESS]
+    consumers: [normalizer]
+    retention: R_raw
+    order_note: Off-node source. Collector runs off every monitored node; client address is the key.
+  - name: raw.pathflow.v0
+    producer: path-flow-collector
+    kinds: [RAW_PATH_FLOW, HEARTBEAT]
+    key_type: KEY_SOURCE_ADDRESS
+    key_components: [SOURCE_ADDRESS]
+    consumers: [normalizer]
+    retention: R_raw
+    order_note: Off-node source. A flow record is exported at its active or idle timeout, so arrival lags flow start.
+  - name: context.cluster.v0
+    producer: context-collector
+    kinds: [CONTEXT_OBSERVATION, CONTEXT_WATCH_GAP, HEARTBEAT]
+    key_type: KEY_OBJECT_UID
+    key_components: [OBJECT_UID]
+    consumers: [normalizer, agent-D, agent-E, agent-F, agent-F-rbac-evaluator, agent-G, agent-H, orchestrator]
+    retention: R_raw
+    order_note: >-
+      Watch order is defined within one watch stream (watch_stream_id,
+      watch_stream_seq); resourceVersion is opaque. The F2 evaluator
+      consumes all partitions into a replicated history (global state);
+      agents D, G and H read it for Pod-to-workload resolution.
+  - name: norm.events.v0
+    producer: normalizer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_PRIMARY_ENTITY
+    key_components: [ENTITY_TYPE_NAME, ENTITY_UID]
+    consumers: [restreamers, orchestrator, graph-view]
+    retention: R_norm
+    order_note: Load distribution only; no consumer relies on its partition order.
+  - name: agent.A.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_REQUEST_ID
+    key_components: [REQUEST_ID]
+    consumers: [agent-A]
+    retention: R_agent
+  - name: agent.B.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_PRINCIPAL
+    key_components: [PRINCIPAL_KIND, PRINCIPAL_ID]
+    consumers: [agent-B]
+    retention: R_agent
+  - name: agent.B.authn.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_UNAUTH_SOURCE
+    key_components: [OBSERVED_SOURCE]
+    consumers: [agent-B]
+    retention: R_agent
+    order_note: Failed authentication has no principal; the key is the observed source (class-level, NAT-prone).
+  - name: agent.C.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_LINEAGE
+    key_components: [LINEAGE_ID]
+    consumers: [agent-C]
+    retention: R_agent
+  - name: agent.D.read.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_TOKEN_FILE_OWNER
+    key_components: [POD_UID, VOLUME_NAME]
+    consumers: [agent-D]
+    retention: R_agent
+    order_note: Keyed by the Pod that owns the token volume, so host and in-Pod readers of one token co-locate.
+  - name: agent.D.use.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_JTI
+    key_components: [JTI]
+    consumers: [agent-D]
+    retention: R_agent
+  - name: credential.instance.v0
+    status: conditional
+    producer: credential-join
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_JTI
+    key_components: [JTI]
+    consumers: [agent-D, agent-G, orchestrator]
+    retention: R_agent
+    order_note: Created only after a read's (dev, ino, version_dir) resolves to a JTI; not published until CRED-JTI-VERSION-INDEX passes.
+  - name: agent.E.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_POD_CONTAINER
+    key_components: [POD_UID, CONTAINER_NAME]
+    consumers: [agent-E]
+    retention: R_agent
+    order_note: >-
+      Container name is stable across a same-Pod restart while the container
+      ID changes; write and re-exec are both eBPF events of one node and are
+      ordered by (node_id, boot_id, node_seq).
+  - name: agent.F.runtime.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_LINEAGE
+    key_components: [LINEAGE_ID]
+    consumers: [agent-F]
+    retention: R_agent
+  - name: agent.F.rbac.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_OBJECT_UID
+    key_components: [OBJECT_UID]
+    consumers: [agent-F]
+    retention: R_agent
+    order_note: F2 state is the replicated RBAC history from context.cluster.v0, not partition-local state.
+  - name: agent.G.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_POD
+    key_components: [POD_UID]
+    consumers: [agent-G]
+    retention: R_agent
+    order_note: G2 joins an exec audit event (target Pod UID resolved by normalization) to the target container's exec on the same key.
+  - name: agent.H.egress.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_POD
+    key_components: [POD_UID]
+    consumers: [agent-H]
+    retention: R_agent
+  - name: agent.H.lineage.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_POD_LINEAGE
+    key_components: [POD_UID, LINEAGE_ID]
+    consumers: [agent-H]
+    retention: R_agent
+    order_note: A Pod runs on one node, so both H4 halves are ordered by (node_id, boot_id, node_seq).
+  - name: agent.H.audit.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_PRINCIPAL
+    key_components: [PRINCIPAL_KIND, PRINCIPAL_ID]
+    consumers: [agent-H]
+    retention: R_agent
+  - name: agent.H.offnode.v0
+    producer: restreamer
+    kinds: [NORMALIZED_EVENT, HEARTBEAT]
+    key_type: KEY_SOURCE_ADDRESS
+    key_components: [SOURCE_ADDRESS]
+    consumers: [agent-H]
+    retention: R_agent
+    order_note: >-
+      H5 joins a database read to path-flow records of one source address.
+      The halves come from different sources, so order is corrected event
+      time with both clock uncertainties after the watermark; the agent
+      resolves the address per event time, so address reuse splits the key's
+      history into intervals.
+  - name: findings.v0
+    producer: agents
+    kinds: [FINDING, HEARTBEAT]
+    key_type: KEY_FINDING_ID
+    key_components: [FINDING_ID]
+    consumers: [orchestrator, graph-view]
+    retention: R_decision
+  - name: witness.decisions.v0
+    producer: orchestrator
+    kinds: [WITNESS, HEARTBEAT]
+    key_type: KEY_WITNESS_ID
+    key_components: [WITNESS_ID]
+    consumers: [graph-view, replay-audit]
+    retention: R_decision
+  - name: incidents.v0
+    producer: orchestrator
+    kinds: [INCIDENT, HEARTBEAT]
+    key_type: KEY_INCIDENT_ID
+    key_components: [INCIDENT_ID]
+    consumers: [analyst, graph-view]
+    retention: R_decision
+  - name: source.completeness.v0
+    producer: all-producers
+    kinds: [SOURCE_COMPLETENESS]
+    key_type: KEY_SOURCE_SCOPE
+    key_components: [SOURCE_NAME, SCOPE]
+    consumers: [orchestrator, graph-view, agent-A, agent-B, agent-C, agent-D, agent-E, agent-F, agent-G, agent-H]
+    order_note: >-
+      Agents read every partition into a completeness index; a rule whose
+      window overlaps a gap on one of its required sources abstains.
+    retention: R_decision
+
+  - name: ground.truth.v0
+    producer: scenario-harness
+    kinds: [GROUND_TRUTH_ACTION, HEARTBEAT]
+    key_type: KEY_RUN
+    key_components: [RUN_ID]
+    consumers: [evaluation, dataset-archiver]
+    retention: R_decision
+    order_note: >-
+      Access-separated. No detector, agent, or orchestrator consumes it.
+      HELD_OUT runs are readable by the evaluation job only after freeze.
+  - name: rule.evaluations.v0
+    producer: agents
+    kinds: [RULE_EVALUATION, HEARTBEAT]
+    key_type: KEY_EVALUATION_ID
+    key_components: [EVALUATION_ID]
+    consumers: [dataset-archiver, evaluation]
+    retention: R_decision
+
+# Which topic carries each finding's inputs. The check verifies that the
+# topic key covers the rule's state key unless the rule is stateless or its
+# state is global (replicated).
+finding_inputs:
+  A1: [agent.A.v0]
+  A2: [agent.A.v0]
+  B1: [agent.B.v0]
+  B2: [agent.B.authn.v0]
+  B3: [agent.B.v0]
+  C1a: [agent.C.v0]
+  C1b: [agent.C.v0]
+  C2: [agent.C.v0]
+  D1: [agent.D.read.v0]
+  D2: [agent.D.use.v0]
+  E1: [agent.E.v0]
+  E2: [agent.E.v0]
+  E3: [agent.E.v0]
+  F1: [agent.F.runtime.v0]
+  F2: [agent.F.rbac.v0]
+  G1a: [agent.G.v0]
+  G1c: [agent.G.v0]
+  G1b: [credential.instance.v0]
+  G2: [agent.G.v0]
+  H1: [agent.H.egress.v0]
+  H2: [agent.H.egress.v0]
+  H3: [agent.H.audit.v0]
+  H4: [agent.H.lineage.v0]
+  H5: [agent.H.offnode.v0]

@@ -1,0 +1,15 @@
+# Roundtrip fault plan: blind (sensor stops seeing file-read events after t=30 min)
+# Stage: source — file.read eBPF records with event_time >= 2024-01-01T00:30:00Z
+# are dropped silently (no gap record; source-stage unreported loss).
+# Expected reconcile: the dropped file.read records appear in the source fault
+# log only; no transit gap record; they count as unreported drops.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: blind-file-reads
+    kind: blind
+    stage: source
+    after: "2024-01-01T00:30:00Z"
+    select:
+      sources: [EBPF]
+      event_families: [file.read]

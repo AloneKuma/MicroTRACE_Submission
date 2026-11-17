@@ -1,0 +1,26 @@
+{
+  "alerts": 1176,
+  "attack_graph_paths": 5,
+  "episode_traces": 72,
+  "k": 10,
+  "mapping": "sage-mapping.v2",
+  "mapping_sha256": "bdc36d785e25506a53cc611b08d5070010bf3d87ef78941822011c9c4e949213",
+  "runs": 164,
+  "runs_with_alerts": 159,
+  "sage_commit": "707a190e7ace8ebbe0800c68f3bd934e58006b50",
+  "sage_exit": 0,
+  "sage_seconds": 1.2,
+  "sage_status": "ok",
+  "skipped": {},
+  "subsequences": 188,
+  "t": 0.5,
+  "variants": {
+    "ag": {
+      "witnesses": 22
+    },
+    "seq": {
+      "witnesses": 761
+    }
+  },
+  "w": 15
+}

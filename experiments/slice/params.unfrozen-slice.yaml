@@ -1,0 +1,24 @@
+# Parameter values for the audit-to-incident integration slice ONLY.
+#
+# These are NOT pilot-chosen or frozen values (parameter-register.md). They are
+# chosen so the slice's controlled requests fall clearly on either side of the
+# threshold within a short run, and every output that uses them carries
+# parameter_set_version UNFROZEN-SLICE. Do not cite them as MicroTRACE settings.
+parameter_set_version: UNFROZEN-SLICE
+
+W_H3_s: 20            # H3 tumbling window length (event time, epoch-aligned)
+N_H3: 8               # H3 fires when the enumeration score EXCEEDS this value
+lateness_s: 3         # lateness allowance applied once at each watermark consumer
+T_seal_s: 30          # orchestrator seals an incident at event_end + T_seal (bounds sealing, as T does)
+max_idle_s: 10        # a completeness frontier older than watermark - max_idle is an excluded source
+heartbeat_s: 1        # producer heartbeat interval
+collector_skew_s: 1   # audit coverage and low watermark trail the last EOF read by this much
+context_coverage_lag_s: 1
+
+# H3 scoring interpretation (rulebook text: "successful secret list/watch
+# requests plus distinct secret names read by get exceed N_H3 ... a list counts
+# as one request per namespace scope"): the slice counts DISTINCT namespace
+# scopes of successful list/watch requests ("*" for cluster scope) plus
+# DISTINCT (namespace, name) of successful gets. Only ResponseComplete records
+# with a 2xx code count.
+h3_score: distinct_list_watch_scopes_plus_distinct_get_names

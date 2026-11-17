@@ -1,0 +1,38 @@
+// MicroTRACE Gap 1 schema v0: admission decision export (raw.kyverno.v0).
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+
+enum AdmissionVerdict {
+  ADMISSION_VERDICT_UNSPECIFIED = 0;
+  PASS = 1;
+  FAIL = 2;
+  WARN = 3;
+  ERROR = 4;
+  SKIP = 5;
+}
+
+message AdmissionDecision {
+  // AdmissionReview request UID. This is not the Pod UID.
+  string admission_request_uid = 1;
+  // request.object.metadata.uid of the created Pod, when exported.
+  optional string resource_uid = 2;
+  string resource_kind = 3;
+  string namespace = 4;
+  string resource_name = 5;
+  string policy = 6;
+  string rule = 7;
+  AdmissionVerdict verdict = 8;
+  // Audit-mode policy: violation recorded, resource allowed.
+  bool enforcement_audit_mode = 9;
+  repeated string image_digests = 10;
+  bool dry_run = 11;
+  // Admission time, present only when exported or reliably joined.
+  optional google.protobuf.Timestamp admission_time = 12;
+  string report_uid = 13;
+  // Report observation time is knowledge time.
+  google.protobuf.Timestamp report_observed_time = 14;
+  string kyverno_version = 15;
+}

@@ -1,0 +1,11 @@
+# PROPOSED (worklog section 4, P-4): 20 % of eBPF records delayed by 1s on every node (source
+# stage), so they arrive out of order; replayed live at real time.
+version: faultplan.v0
+seed: 3300
+faults:
+  - id: reorder-1s
+    kind: delay
+    stage: source
+    delay: 1s
+    rate: 0.2
+    select: {sources: [EBPF]}

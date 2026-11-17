@@ -1,0 +1,122 @@
+# SAGE baseline: finding -> SAGE alert mapping (Exp. 2 and Exp. 3).
+#
+# Status: FROZEN 2026-11-01 (decision S-11). v2 = sage-mapping.v1 (S-10: v0 plus
+# G1c) without the selector entity:SERVICE in the A1 and A2 destinations.
+# EntityType has no SERVICE, so v1 could not be applied to any A1 or A2 finding
+# that names no Pod. Removing it gives what v1 states: Pod if present, else
+# const:gateway. Decided before any SAGE fit or score existed. v0 and v1 stay
+# as the record.
+# Its sha256 is recorded in src/params/sage.v0.yaml (mapping_sha256),
+# parameter-register.md and docs/plans/sage-baseline.md; run.py refuses a
+# mapping whose hash differs. Any change is a new version (sage-mapping.v3).
+#
+# Paper (D3_v6 "Baselines and Ablation Studies"): each finding becomes a SAGE
+# alert whose source and destination are its calling principal or source
+# workload and its target workload, whose signature is its finding type, and
+# whose attack stage comes from a frozen mapping. Decided 2026-10-24: the
+# stage comes from the finding type (8 of the 16 rules have no ATT&CK tactic,
+# and SAGE itself maps alert signatures, not tactics, to stages).
+#
+# SAGE: github.com/tudelft-cda-lab/SAGE at the commit below, MicroAttackStage
+# names from signatures/attack_stages.py. SAGE builds attack graphs only toward
+# high-severity objectives (stage value >= 100); here those are H1 and H4.
+#
+# Endpoint selectors, tried in order, first non-empty wins:
+#   entity:<EntityType>[#n]  n-th entity of that type in Finding.entities (uid, else name)
+#   attr:<key>               Finding.attributes[key]
+#   const:<name>             a fixed per-run endpoint (e.g. the API server)
+#   self                     the source endpoint (an action inside the source workload)
+#
+# Egress (H1, H2, H4) is destined to the acting workload itself (decision S-7,
+# 2026-10-24): in SAGE every later alert about a victim joins its sequence,
+# and an external endpoint is not a workload; with it, an in-Pod chain could
+# never reach its exfiltration step. G1a keeps the remote Pod.
+# Endpoints become pseudo-IPs, unique per run (mtcore.baselines.sage.alerts).
+# port: Finding.attributes key holding the destination port, if any; SAGE
+# names the service from it (IANA table), else "unknown".
+
+version: sage-mapping.v2
+sage_commit: 707a190e7ace8ebbe0800c68f3bd934e58006b50
+flexfringe_commit: 1a87e3b
+category: MicroTRACE finding
+
+findings:
+  A1:   # injection-pattern (gateway request)
+    stage: PUBLIC_APP_EXP
+    source: [entity:UNAUTHENTICATED_SOURCE, entity:NETWORK_ENDPOINT, entity:USER, entity:SERVICE_ACCOUNT, const:client]
+    destination: [entity:POD, const:gateway]
+  A2:   # injection-success-indicator: the exploit worked
+    stage: ARBITRARY_CODE_EXE
+    source: [entity:UNAUTHENTICATED_SOURCE, entity:NETWORK_ENDPOINT, entity:USER, entity:SERVICE_ACCOUNT, const:client]
+    destination: [entity:POD, const:gateway]
+  B1:   # resource-enumeration by a principal
+    stage: INFO_DISC
+    source: [entity:SERVICE_ACCOUNT, entity:USER]
+    destination: [const:apiserver]
+  B2:   # auth-failure-burst from one source
+    stage: BRUTE_FORCE_CREDS
+    source: [entity:UNAUTHENTICATED_SOURCE, entity:NETWORK_ENDPOINT]
+    destination: [const:apiserver]
+  B3:   # request-rate-spike by a principal
+    stage: SERVICE_DISC
+    source: [entity:SERVICE_ACCOUNT, entity:USER]
+    destination: [const:apiserver]
+  C1a:  # escape indicators (setns/unshare/mount, capset, runtime socket, bpf)
+    stage: PRIV_ESC
+    source: [entity:POD]
+    destination: [self]
+  C1b:  # observed escape to the host namespaces
+    stage: ROOT_PRIV_ESC
+    source: [entity:POD]
+    destination: [self]
+  C2:   # ptrace attach/poke on another process (process injection)
+    stage: DEFENSE_EVASION
+    source: [entity:POD]
+    destination: [self]
+  D1:   # token read by an unexpected reader; target = the token owner's Pod.
+        # PRIV_ESC: SAGE maps exposed credentials here ("cleartext password" signatures)
+    stage: PRIV_ESC
+    source: [attr:reader_pod_uid, attr:token_owner_pod_uid]
+    destination: [attr:token_owner_pod_uid]
+  E1:   # unsigned image admitted (audit-mode policy)
+    stage: DEFENSE_EVASION
+    source: [entity:POD]
+    destination: [self]
+  E2:   # post-start executable write
+    stage: ARBITRARY_CODE_EXE
+    source: [entity:POD]
+    destination: [self]
+  F1:   # capability or euid gain
+    stage: USER_PRIV_ESC
+    source: [entity:POD]
+    destination: [self]
+  G1a:  # unbaselined in-cluster connection
+    stage: LATERAL_MOVEMENT
+    source: [entity:POD#0]
+    destination: [entity:POD#1, attr:destination_workload, const:cluster]
+    port: port
+  G1c:  # unbaselined inbound in-cluster connection: G1a's connection seen from
+        # the accepting Pod. Its entities are [accepting Pod, connecting Pod],
+        # the reverse of G1a's, so source and destination are swapped here and
+        # both ends of one connection give the same SAGE endpoint pair.
+    stage: LATERAL_MOVEMENT
+    source: [entity:POD#1, attr:source_workload, const:cluster]
+    destination: [entity:POD#0]
+    port: port
+  H1:   # egress volume anomaly
+    stage: DATA_EXFILTRATION
+    source: [entity:POD]
+    destination: [self]
+  H2:   # unseen external destination
+    stage: COMMAND_AND_CONTROL
+    source: [entity:POD]
+    destination: [self]
+    port: port
+  H3:   # bulk secret enumeration by a principal
+    stage: INFO_DISC
+    source: [entity:SERVICE_ACCOUNT, entity:USER]
+    destination: [const:apiserver]
+  H4:   # sensitive read then external transfer
+    stage: DATA_EXFILTRATION
+    source: [entity:POD]
+    destination: [self]

@@ -1,0 +1,5 @@
+# Generated from spec/proto by src/scripts/gen-proto.sh
+python/gen/
+go/gen/
+__pycache__/
+.pytest_cache/

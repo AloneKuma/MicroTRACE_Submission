@@ -1,0 +1,42 @@
+# Exp. 3 conditions (mtcore.exp3.run). Every value here is PROPOSED (docs/plans/exp3-runner-worklog.md
+# section 4) until the user approves it; fixed from development data only, committed before the session.
+# Columns (tab-separated): condition, template (experiments/exp3/plans/), mode (offline: replay at once,
+# then the offline passes; live: real-time replay with agents and GO on Kafka as well), pace (event-time
+# speed; 0 = at once), tier (1 core, 2 optional: --max-tier), needs (condition:pass whose output the plan
+# reads, or -), note.
+nofault	nofault.yaml	live	1	1	-	reference; Exp. 1 latency (live_full); offline passes on what arrived
+loss-transit-05	loss-transit-05.yaml	offline	0	1	-	05 % loss after sequencing (reported)
+loss-transit-10	loss-transit-10.yaml	offline	0	1	-	10 % loss after sequencing (reported)
+loss-transit-20	loss-transit-20.yaml	offline	0	1	-	20 % loss after sequencing (reported)
+loss-transit-30	loss-transit-30.yaml	offline	0	1	-	30 % loss after sequencing (reported)
+loss-transit-40	loss-transit-40.yaml	offline	0	1	-	40 % loss after sequencing (reported)
+loss-source-05	loss-source-05.yaml	offline	0	2	-	05 % loss before sequencing (unreported)
+loss-source-10	loss-source-10.yaml	offline	0	1	-	10 % loss before sequencing (unreported)
+loss-source-20	loss-source-20.yaml	offline	0	2	-	20 % loss before sequencing (unreported)
+loss-source-30	loss-source-30.yaml	offline	0	2	-	30 % loss before sequencing (unreported)
+loss-source-40	loss-source-40.yaml	offline	0	1	-	40 % loss before sequencing (unreported)
+outage-ebpf-transit	outage-ebpf-transit.yaml	offline	0	1	-	ebpf blocked 60 s, reported
+outage-gateway-transit	outage-gateway-transit.yaml	offline	0	1	-	gateway blocked 60 s, reported
+outage-audit-transit	outage-audit-transit.yaml	offline	0	1	-	audit blocked 60 s, reported
+outage-kyverno-transit	outage-kyverno-transit.yaml	offline	0	1	-	kyverno blocked 60 s, reported
+outage-ebpf-source	outage-ebpf-source.yaml	offline	0	1	-	ebpf blocked 60 s, unreported
+outage-gateway-source	outage-gateway-source.yaml	offline	0	2	-	gateway blocked 60 s, unreported
+outage-audit-source	outage-audit-source.yaml	offline	0	2	-	audit blocked 60 s, unreported
+outage-kyverno-source	outage-kyverno-source.yaml	offline	0	2	-	kyverno blocked 60 s, unreported
+skew-10s-declared	skew-10s-declared.yaml	offline	0	1	-	largest worker clock +10s, uncertainty declared
+skew-10s-undeclared	skew-10s-undeclared.yaml	offline	0	1	-	largest worker clock +10s, uncertainty undeclared
+skew-1s-declared	skew-1s-declared.yaml	offline	0	2	-	largest worker clock +1s, uncertainty declared
+skew-1s-undeclared	skew-1s-undeclared.yaml	offline	0	2	-	largest worker clock +1s, uncertainty undeclared
+reorder-1s	reorder-1s.yaml	live	1	1	-	20 % of eBPF delayed 1s, real time (lateness_s 2)
+reorder-5s	reorder-5s.yaml	live	1	1	-	20 % of eBPF delayed 5s, real time (lateness_s 2)
+suppress-transit	suppress-transit.yaml	offline	0	1	nofault:full	decisive contradicting records dropped, transit
+suppress-source	suppress-source.yaml	offline	0	1	nofault:full	decisive contradicting records dropped, source
+compromise-stop	compromise-stop.yaml	live	1	1	-	target node stops after its escape record (live: idle detection)
+compromise-blind	compromise-blind.yaml	offline	0	1	-	target node drops net.connect after its escape record
+compromise-forge	compromise-forge.yaml	offline	0	1	-	target node forges 5 net.connect copies after its escape record
+nohistory	nohistory.yaml	offline	0	1	-	No-History ablation (Q-3): no fault on the latest-mapping identity variant; its full pass = No-History
+nohistory-loss-transit-05	nohistory-loss-transit-05.yaml	offline	0	1	-	No-History variant + 05 % transit loss
+nohistory-loss-transit-10	nohistory-loss-transit-10.yaml	offline	0	1	-	No-History variant + 10 % transit loss
+nohistory-loss-transit-20	nohistory-loss-transit-20.yaml	offline	0	1	-	No-History variant + 20 % transit loss
+nohistory-loss-transit-30	nohistory-loss-transit-30.yaml	offline	0	1	-	No-History variant + 30 % transit loss
+nohistory-loss-transit-40	nohistory-loss-transit-40.yaml	offline	0	1	-	No-History variant + 40 % transit loss

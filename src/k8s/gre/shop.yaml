@@ -1,0 +1,62 @@
+# The application namespace the GRE may act in, its isolation
+# NetworkPolicy, and baseline workloads. Tests create their own uniquely
+# named targets next to these. Applied before response-rbac.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: shop
+---
+# Isolate: a Pod labelled microtrace.io/isolated=true loses all ingress and
+# egress. Pre-installed; the GRE only sets the label.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: microtrace-isolate, namespace: shop}
+spec:
+  podSelector:
+    matchLabels:
+      microtrace.io/isolated: "true"
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: checkout, namespace: shop}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: checkout}}
+  template:
+    metadata: {labels: {app: checkout}}
+    spec:
+      nodeSelector: {microtrace.io/role: app}
+      containers:
+        - name: checkout
+          image: registry.k8s.io/pause:3.10
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: v1
+kind: Service
+metadata: {name: ledger, namespace: shop}
+spec:
+  clusterIP: None
+  selector: {app: ledger}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: ledger, namespace: shop}
+spec:
+  serviceName: ledger
+  replicas: 1
+  selector: {matchLabels: {app: ledger}}
+  template:
+    metadata: {labels: {app: ledger}}
+    spec:
+      nodeSelector: {microtrace.io/role: app}
+      containers:
+        - name: ledger
+          image: registry.k8s.io/pause:3.10
+          imagePullPolicy: IfNotPresent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: checkout-reader, namespace: shop}
+subjects: [{kind: ServiceAccount, name: default, namespace: shop}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view}

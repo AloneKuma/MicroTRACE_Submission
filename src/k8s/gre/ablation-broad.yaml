@@ -1,0 +1,50 @@
+# The "permissions" guard ablation (build step 7.5; Exp. 5 part B). NOT part
+# of the GRE deployment: applied by the ablation tests and deleted after.
+#
+# gre-broad stands for an executor given one wide identity instead of four
+# narrow ones: every write the four actions need, on every object of those
+# kinds, cluster-wide, and no ValidatingAdmissionPolicy matches it. With
+# --ablate permissions the executor mints it for every action, and a
+# compromised executor holding it is no longer bounded to one mutation
+# class (the "Compromised executor" row).
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-broad, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: gre-broad}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "patch", "update", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "list", "patch", "update", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "patch", "update", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: gre-broad}
+subjects: [{kind: ServiceAccount, name: gre-broad, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: gre-broad}
+---
+# the executor may mint it (a separate Role, so deleting this file restores
+# the four-account minting rule untouched)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-executor-mint-broad, namespace: microtrace}
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["gre-broad"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-executor-mint-broad, namespace: microtrace}
+subjects: [{kind: ServiceAccount, name: gre-executor, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-executor-mint-broad}

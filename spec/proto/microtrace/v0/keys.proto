@@ -1,0 +1,61 @@
+// MicroTRACE Gap 1 schema v0: Kafka record-key vocabulary.
+// Keys are NOT Protobuf-encoded. These enums fix the numeric codes used by
+// the length-delimited key encoding in spec/kafka/kafka-contract.md, so the
+// codes have one definition shared by producers and checks.
+syntax = "proto3";
+
+package microtrace.v0;
+
+enum KeyType {
+  KEY_TYPE_UNSPECIFIED = 0;
+  KEY_NODE = 1;               // (NODE_ID)
+  KEY_AUDIT_ID = 2;           // (AUDIT_ID)
+  KEY_REQUEST_ID = 3;         // (REQUEST_ID)
+  KEY_ADMISSION = 4;          // (ADMISSION_UID)
+  KEY_OBJECT_UID = 5;         // (OBJECT_UID)
+  KEY_PRIMARY_ENTITY = 6;     // (ENTITY_TYPE, ENTITY_UID)
+  KEY_PRINCIPAL = 7;          // (PRINCIPAL_KIND, PRINCIPAL_ID)
+  KEY_UNAUTH_SOURCE = 8;      // (OBSERVED_SOURCE)
+  KEY_LINEAGE = 9;            // (LINEAGE_ID)
+  KEY_TOKEN_FILE_OWNER = 10;  // (POD_UID, VOLUME_NAME)
+  KEY_JTI = 11;               // (JTI)
+  KEY_POD_CONTAINER = 12;     // (POD_UID, CONTAINER_NAME)
+  KEY_POD_LINEAGE = 13;       // (POD_UID, LINEAGE_ID)
+  KEY_POD = 14;               // (POD_UID)
+  KEY_FINDING_ID = 15;        // (FINDING_ID)
+  KEY_WITNESS_ID = 16;        // (WITNESS_ID)
+  KEY_INCIDENT_ID = 17;       // (INCIDENT_ID)
+  KEY_SOURCE_SCOPE = 18;      // (SOURCE, SCOPE)
+  KEY_PRODUCER_INSTANCE = 19; // (PRODUCER_INSTANCE); heartbeats, explicit partition
+  KEY_RUN = 20;               // (RUN_ID)
+  KEY_EVALUATION_ID = 21;     // (EVALUATION_ID)
+  KEY_SOURCE_ADDRESS = 22;    // (SOURCE_ADDRESS); off-node records, H5
+}
+
+enum KeyComponent {
+  KEY_COMPONENT_UNSPECIFIED = 0;
+  NODE_ID = 1;
+  AUDIT_ID = 2;
+  REQUEST_ID = 3;
+  ADMISSION_UID = 4;
+  OBJECT_UID = 5;
+  ENTITY_TYPE_NAME = 6;
+  ENTITY_UID = 7;
+  PRINCIPAL_KIND = 8;
+  PRINCIPAL_ID = 9;
+  OBSERVED_SOURCE = 10;
+  LINEAGE_ID = 11;
+  POD_UID = 12;
+  VOLUME_NAME = 13;
+  JTI = 14;
+  CONTAINER_NAME = 15;
+  FINDING_ID = 16;
+  WITNESS_ID = 17;
+  INCIDENT_ID = 18;
+  SOURCE_NAME = 19;
+  SCOPE = 20;
+  PRODUCER_INSTANCE = 21;
+  RUN_ID = 22;
+  EVALUATION_ID = 23;
+  SOURCE_ADDRESS = 24;
+}

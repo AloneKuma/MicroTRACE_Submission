@@ -1,0 +1,5 @@
+# Smoke test pass list (development runs as set "smoke"); same pass types as heldout-main.tsv.
+go_main	go	src/params/frozen/pilot-multistep-fit.K10.mlB3.yaml	smoke	experiments/heldout/splits/smoke.json	smoke
+go_rules	go	src/params/frozen/pilot-multistep-fit.K10.yaml	smoke	experiments/heldout/splits/smoke.json	smoke
+sage_ag	sage	src/params/frozen/pilot-multistep-fit.K10.mlB3.yaml	smoke	experiments/heldout/splits/smoke.json	smoke	go_main	ag
+sage_seq	sage	src/params/frozen/pilot-multistep-fit.K10.mlB3.yaml	smoke	experiments/heldout/splits/smoke.json	smoke	go_main	seq

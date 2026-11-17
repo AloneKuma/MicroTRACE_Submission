@@ -1,0 +1,16 @@
+# name	correlator	params	set	split	half	findings_from	sage_variant
+# HELD_OUT (PILOT-type): main row (filters B3 Isolation Forest, B1 one-class SVM, H1 kNN; user 2026-11-12),
+# side rows: the earlier frozen B3-only setting (go_mlB3) and rules-only; SAGE on the main row's findings
+# (SAGE t, w were fitted on rules-only FIT findings and refitted on the main row's FIT findings on 2026-11-13 with the same grid and rule: same values, so sage.v0 stays; it gets the same findings as the GO main row).
+# HELD_OUT-cases (Targeted-type, rules-only): Full and the five Exp. 2 ablations.
+# Exp. 1 telemetry ablations (decided 2026-11-15): main-row params, one of the four security sources
+# dropped and declared not shipped (column 7 drop:<SOURCE>); auxiliary sources kept. The "Agent X only"
+# rows and the KAIROS-comparison row are not passes: go_main's summary.json per_agent and host_steps.
+cases_full	go	src/params/frozen/fit-ri-on.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_no_conflict	go	src/params/frozen/fit-ri-on-no_conflict.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_no_distinct	go	src/params/frozen/fit-ri-on-no_distinct.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_no_origin	go	src/params/frozen/fit-ri-on-no_origin.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_no_tactic	go	src/params/frozen/fit-ri-on-no_tactic.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_no_witness	go	src/params/frozen/fit-ri-on-no_witness.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases
+cases_sage_ag	sage	src/params/frozen/fit-ri-on.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases	cases_full	ag
+cases_sage_seq	sage	src/params/frozen/fit-ri-on.K10.yaml	held_out_cases	experiments/heldout/splits/held_out_cases.json	held_out_cases	cases_full	seq

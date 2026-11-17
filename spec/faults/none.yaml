@@ -1,0 +1,5 @@
+version: faultplan.v0
+seed: 0
+# No faults: faultinject -pace replays a stream at event-time speed with this
+# plan (Exp. 5 input-rate sweep, mtcore.harness.stack).
+faults: []

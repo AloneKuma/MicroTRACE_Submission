@@ -1,0 +1,12 @@
+# PROPOSED (worklog section 4, P-6): host compromise, simulated at the sender. The node of the
+# run's first escape-class (PRIORITY-lane) eBPF record stops sending 1 s after that record.
+# Replayed live, so the receiver's idle detection (max_idle) sees the silence.
+version: faultplan.v0
+seed: 3500
+target: first-priority-ebpf
+faults:
+  - id: compromise-stop
+    kind: stop
+    stage: source
+    nodes: target
+    after: "target+1s"

@@ -1,0 +1,8 @@
+# GO time on the nested Core subsets, summed over the subset's runs from the Exp. 4 timing session's
+# one-run units (config full, m1; per-run stats.json of rep1-rep3, s3://.../results/exp4-timing/passes/).
+# go_peak_rss_mb: peak RSS of each run's GO process (/usr/bin/time), largest over the 3 repeats; max and median over the subset's runs.
+runs	findings	go_s_rep1	go_s_rep2	go_s_rep3	go_s_median	ms_per_finding	go_peak_rss_mb_max_run	go_peak_rss_mb_median_run
+41	280	40.6	40.89	40.92	40.89	146.0	1212.6	1086.3
+82	571	79.4	79.73	79.66	79.66	139.5	1213.0	1086.4499999999998
+164	1176	156.72	157.43	157.42	157.42	133.9	1213.2	1086.4
+328	2405	307.87	309.42	309.48	309.42	128.7	1214.3	1084.9499999999998

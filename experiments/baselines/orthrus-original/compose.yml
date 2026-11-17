@@ -1,0 +1,74 @@
+# The original ORTHRUS repo (github.com/ubc-provenance/orthrus) with the
+# authors' pre-trained weights, on the one-session AWS machine
+# (experiments/aws/pidsmaker, aws_instance.orthrus, g5.8xlarge).
+#
+# Same as the repo's compose-postgres.yml + compose-pidsmaker.yml in one file,
+# except: one GPU, the repo mounted at /home (where its Dockerfile puts it),
+# THEIA-E3 restored from the same dump as the PIDSMaker runs, and Python
+# output unbuffered so a killed run still leaves its log.
+name: mtorig
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: mtorig-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command: ["postgres", "-c", "shared_buffers=8GB", "-c", "work_mem=256MB",
+              "-c", "maintenance_work_mem=2GB", "-c", "max_wal_size=8GB"]
+    shm_size: 2g
+    networks:
+      mtorig_net:
+        aliases: [postgres]
+    volumes:
+      - mtorig_pgdata:/var/lib/postgresql/data
+      - ./orthrus/postgres/init-create-empty-databases.sh:/docker-entrypoint-initdb.d/init-create-empty-databases.sh:ro
+      - ./data:/data:ro
+    mem_limit: 16g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pids:
+    build:
+      context: ./orthrus
+    image: mtorig-pids:e7f25df
+    container_name: mtorig-pids
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PYTHONHASHSEED: "0"
+      PYTHONUNBUFFERED: "1"
+      WANDB_MODE: disabled
+    networks:
+      - mtorig_net
+    volumes:
+      - ./orthrus:/home
+    entrypoint: bash
+    stdin_open: true
+    tty: true
+    shm_size: 8g
+    mem_limit: 104g
+    memswap_limit: 104g
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  mtorig_net:
+    name: mtorig_net
+
+volumes:
+  mtorig_pgdata:
+    name: mtorig_pgdata

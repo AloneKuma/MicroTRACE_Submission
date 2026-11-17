@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MicroTRACE Source Template Manifest Schema",
+  "description": "Metadata for benign-background templates loaded from public datasets: pool assignments, intake card, field mappings, and licence status",
+  "type": "object",
+  "required": ["manifest_version", "sources"],
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "pattern": "^source-template-manifest\\.v[0-9]+$",
+      "description": "Template manifest schema version"
+    },
+    "description": {
+      "type": "string",
+      "description": "Overall manifest description"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Manifest creation timestamp"
+    },
+    "sources": {
+      "type": "array",
+      "description": "Array of source datasets and their template status",
+      "items": {
+        "$ref": "#/definitions/source_dataset"
+      }
+    }
+  },
+  "definitions": {
+    "source_dataset": {
+      "type": "object",
+      "required": ["name", "status", "intake_card"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["BETH", "LID-DS-2021", "CSIC-2010", "K8NTEXT", "Kube-IDS0", "DARPA-TC-E3-CADETS"],
+          "description": "Source dataset identifier"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["accepted-template", "external-only", "rejected", "unverified"],
+          "description": "Template acceptance status"
+        },
+        "intake_card": {
+          "$ref": "#/definitions/intake_card"
+        },
+        "licence_info": {
+          "$ref": "#/definitions/licence_info"
+        },
+        "file_level_hashes": {
+          "type": "object",
+          "description": "SHA-256 hashes of source files for integrity verification",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "intake_card": {
+      "type": "object",
+      "required": ["accepted_fields", "benign_row_definition", "pool_assignment"],
+      "properties": {
+        "accepted_fields": {
+          "type": "array",
+          "description": "Field names accepted from source records",
+          "items": { "type": "string" }
+        },
+        "benign_row_definition": {
+          "type": "string",
+          "description": "Predicate or filter identifying benign rows in source (e.g., 'evil=0 AND sus=0' for BETH)"
+        },
+        "transformation": {
+          "type": "string",
+          "description": "How source values are transformed (e.g., 'Docker PID → kernel PID', 'relative time → absolute')"
+        },
+        "pool_assignment": {
+          "type": "object",
+          "required": ["dev_pool", "held_out_pool"],
+          "properties": {
+            "dev_pool": {
+              "type": "object",
+              "description": "DEV pool assignment for PILOT/RESEARCH runs",
+              "properties": {
+                "split_criteria": { "type": "string", "description": "How to select rows for DEV pool" },
+                "estimated_record_count": { "type": "integer" }
+              }
+            },
+            "held_out_pool": {
+              "type": "object",
+              "description": "HELD_OUT_POOL assignment for held-out runs",
+              "properties": {
+                "split_criteria": { "type": "string", "description": "How to select rows for HELD_OUT_POOL" },
+                "estimated_record_count": { "type": "integer" }
+              }
+            },
+            "excluded": {
+              "type": "object",
+              "description": "Rows explicitly excluded from both pools",
+              "properties": {
+                "reason": { "type": "string" },
+                "estimated_record_count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "fitted_parameters": {
+          "type": "array",
+          "description": "Which baseline/parameter artifacts are fitted on this source",
+          "items": {
+            "type": "object",
+            "properties": {
+              "symbol": { "type": "string", "description": "Parameter symbol (e.g., S_B1, E_D1)" },
+              "fitted_on": { "type": "string", "description": "Pool used for fitting" },
+              "metric": { "type": "string", "description": "What was measured/computed" }
+            }
+          }
+        }
+      }
+    },
+    "licence_info": {
+      "type": "object",
+      "required": ["licence_id", "status", "attribution"],
+      "properties": {
+        "licence_id": {
+          "type": "string",
+          "description": "Licence identifier (SPDX ID or name)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["public", "local-only", "restricted"],
+          "description": "Redistribution status"
+        },
+        "attribution": {
+          "type": "string",
+          "description": "Required attribution text"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Licence text URL"
+        },
+        "permitted_uses": {
+          "type": "array",
+          "description": "Explicitly permitted uses of this source material",
+          "items": {
+            "type": "string",
+            "enum": ["research", "commercial", "derivative", "benchmark"]
+          }
+        },
+        "forbidden_uses": {
+          "type": "array",
+          "description": "Explicitly forbidden uses",
+          "items": { "type": "string" }
+        },
+        "redistribution_note": {
+          "type": "string",
+          "description": "Any special restrictions or requirements for redistribution"
+        }
+      }
+    }
+  }
+}

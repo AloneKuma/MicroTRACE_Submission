@@ -1,0 +1,14 @@
+# PROPOSED (worklog section 4, P-6): host compromise: the target node inserts 5 forged copies of
+# its first net.connect record at or after 1 s past its first escape-class record (unsealed copies;
+# invalid-seal forgery waits for the GO's seal, evaluation-plan "Exp. 3 by fault").
+version: faultplan.v0
+seed: 3500
+target: first-priority-ebpf
+faults:
+  - id: compromise-forge
+    kind: forge
+    stage: source
+    nodes: target
+    after: "target+1s"
+    count: 5
+    select: {event_families: [net.connect]}

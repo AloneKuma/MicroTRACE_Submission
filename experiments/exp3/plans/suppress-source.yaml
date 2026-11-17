@@ -1,0 +1,9 @@
+# PROPOSED (worklog section 4, P-5): every decisive contradicting record of the run (from the
+# no-fault Full output on the same run) is dropped, source stage.
+version: faultplan.v0
+seed: 3400
+faults:
+  - id: suppress-source
+    kind: suppress
+    stage: source
+    select: {logical_ids: "@decisive_contradictions"}

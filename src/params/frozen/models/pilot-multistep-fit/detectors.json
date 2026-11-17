@@ -1,0 +1,22 @@
+{
+ "B1": {
+  "alpha": 0.001,
+  "calibration_runs": 81,
+  "calibration_windows_scored": 2088,
+  "cut": -1.7312446783023632,
+  "kind": "ocsvm",
+  "model_version": "DET_B1@sha256:355b4c59f7110cdd",
+  "proper_runs": 89,
+  "runs": 170
+ },
+ "H1": {
+  "alpha": 0.001,
+  "calibration_runs": 81,
+  "calibration_windows_scored": 3584,
+  "cut": 0.5276427284403051,
+  "kind": "knn",
+  "model_version": "DET_H1@sha256:ff7ca787837bee3e",
+  "proper_runs": 89,
+  "runs": 170
+ }
+}

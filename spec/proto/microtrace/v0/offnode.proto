@@ -1,0 +1,102 @@
+// MicroTRACE Gap 1 schema v0: off-node corroboration records
+// (raw.dbaudit.v0, raw.pathflow.v0). Both are observed outside the node that
+// originates the traffic, so a host compromise of that node cannot edit them
+// unless their own source runs on it (design-spec.md, node-trust epoch). They
+// are not among the four security telemetry sources. Statement text, result
+// rows and packet payloads are never carried.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/ebpf.proto";
+
+// One database audit record for a completed statement. The engine, audit
+// plugin and policy are recorded per run (parameter-register.md).
+message DbAuditRecord {
+  // Engine-native audit record ID, or a collector-assigned durable ID.
+  string record_id = 1;
+  // Engine and audit plugin with versions, e.g. "<engine>/<plugin>@<version>".
+  string engine = 2;
+  string audit_policy_version = 3;
+  string database = 4;
+  // Accessed object (schema-qualified table or collection), when logged.
+  string object_name = 5;
+  // Statement class only (SELECT, COPY TO, ...); never statement text.
+  string statement_class = 6;
+  // Client address as the database server saw it. Must be the client's
+  // address, not a proxy's (OFFNODE-DBAUDIT-SOURCE).
+  Endpoint client = 7;
+  string db_user = 8;
+  bool succeeded = 9;
+  // Result size as logged by the engine. Absent when the engine does not log
+  // it; H5 then abstains (FIELD_ABSENT).
+  optional uint64 rows_returned = 10;
+  optional uint64 bytes_returned = 11;
+  // Database server clock time of statement completion.
+  google.protobuf.Timestamp server_time = 12;
+}
+
+enum FlowEndReason {
+  FLOW_END_REASON_UNSPECIFIED = 0;
+  IDLE_TIMEOUT = 1;
+  ACTIVE_TIMEOUT = 2;
+  END_OF_FLOW = 3;
+  FORCED_END = 4;
+  LACK_OF_RESOURCES = 5;
+}
+
+// One flow record exported by an off-node path observer that every node's
+// egress traverses (OFFNODE-PATH-COVERAGE). A long flow is split into
+// several records at the active timeout.
+message PathFlowRecord {
+  string observer_id = 1;
+  // Exporter flow key or sequence; with observer_id it is the native ID.
+  string exporter_flow_id = 2;
+  // Active/idle timeouts and sampling configuration in force.
+  string export_config_version = 3;
+  Endpoint src = 4;
+  Endpoint dst = 5;
+  // Source-to-destination direction only.
+  uint64 octets = 6;
+  uint64 packets = 7;
+  google.protobuf.Timestamp flow_start = 8;
+  google.protobuf.Timestamp flow_end = 9;
+  FlowEndReason end_reason = 10;
+  // True when the observer sampled packets; H5 then abstains on byte checks.
+  bool sampled = 11;
+}
+
+enum SourceAddressClass {
+  SOURCE_ADDRESS_CLASS_UNSPECIFIED = 0;
+  // Address held by one Pod for an interval covering the event.
+  POD_ADDRESS = 1;
+  // A node IP not held by any hostNetwork Pod with a declared flow signature:
+  // the node's host network context.
+  NODE_HOST_CONTEXT = 2;
+  // Overlapping holders, masquerade, or no mapping: JOIN_UNCERTAIN.
+  AMBIGUOUS = 3;
+}
+
+// Attribution derived for an off-node record through the time-indexed
+// address map (Pod IPs and node IPs). Absent fields were not established.
+message OffNodeDerived {
+  // The address the record attributes the action to (DbAuditRecord.client.ip
+  // or PathFlowRecord.src.ip).
+  string source_address = 1;
+  SourceAddressClass source_address_class = 2;
+  optional string pod_uid = 3;
+  // Set for NODE_HOST_CONTEXT, and for POD_ADDRESS when the Pod's node is
+  // known. boot_id is the node's boot ID at the event time.
+  optional string node_uid = 4;
+  optional string boot_id = 5;
+  string address_map_version = 6;
+  // Remote endpoint class of a path flow: cluster Pod, cluster Service, or
+  // external.
+  string remote_class = 7;
+  // Name of the declared host-component flow signature the flow matches
+  // (kubelet, container runtime, kube-proxy, CNI, node agent, a declared
+  // hostNetwork Pod); empty when none matches.
+  string host_component_match = 8;
+  string host_signature_version = 9;
+}

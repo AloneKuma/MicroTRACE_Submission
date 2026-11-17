@@ -1,0 +1,388 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MicroTRACE Scenario Catalogue Schema",
+  "description": "Machine-checkable format for the scenario catalogue (catalogue.v0.yaml)",
+  "type": "object",
+  "required": ["version", "status", "scenarios"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Catalogue version identifier; an overlay names itself, e.g. catalogue.pilot-cases.v0",
+      "pattern": "^catalogue(\\.[a-z0-9-]+)?\\.v[0-9]+$"
+    },
+    "status": {
+      "type": "string",
+      "description": "Catalogue lifecycle status",
+      "enum": ["draft", "reviewed", "frozen"]
+    },
+    "frozen_sha256": {
+      "type": "string",
+      "description": "SHA-256 hash of the frozen catalogue (required when status=frozen)",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "coverage_required": {
+      "type": "boolean",
+      "description": "Whether the catalogue must satisfy complete coverage of findings"
+    },
+    "scenarios": {
+      "type": "array",
+      "description": "Array of scenario definitions",
+      "items": {
+        "$ref": "#/definitions/scenario"
+      }
+    }
+  },
+  "definitions": {
+    "scenario": {
+      "type": "object",
+      "description": "A single scenario (attack, lookalike, degraded, nonlink, benign_workload, or admin)",
+      "required": ["id", "kind", "title", "source", "roles", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Scenario identifier (unique within catalogue)",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Scenario classification",
+          "enum": ["attack", "lookalike", "degraded", "nonlink", "benign_workload", "admin"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable scenario title"
+        },
+        "source": {
+          "$ref": "#/definitions/source"
+        },
+        "author": {
+          "type": "string",
+          "description": "Author name (person or identifier)"
+        },
+        "reviewer": {
+          "type": "string",
+          "description": "Reviewer name (person or identifier)"
+        },
+        "adaptation_note": {
+          "type": "string",
+          "description": "Note on how the scenario was adapted from its source"
+        },
+        "roles": {
+          "type": "array",
+          "description": "Abstract actors and targets in the scenario",
+          "items": {
+            "type": "object",
+            "required": ["name", "kind"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Role identifier (e.g., 'internet_client', 'frontend_pod')"
+              },
+              "kind": {
+                "type": "string",
+                "description": "Type of actor",
+                "enum": ["external_client", "internal_pod", "peer_pod", "service_account", "namespace", "node", "operator"]
+              },
+              "of": {
+                "type": "string",
+                "description": "peer_pod only: the earlier internal_pod role whose service this Pod also belongs to (another replica, same ServiceAccount)"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of this role"
+              }
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "description": "Ordered sequence of scenario steps",
+          "items": {
+            "$ref": "#/definitions/step"
+          }
+        },
+        "links": {
+          "type": "array",
+          "description": "Expected actionlinks (provenance connections) between steps",
+          "items": {
+            "$ref": "#/definitions/link"
+          }
+        },
+        "variants": {
+          "type": "array",
+          "description": "Scenario variants (different parameterizations or rule-shaping)",
+          "items": {
+            "$ref": "#/definitions/variant"
+          }
+        },
+        "observability": {
+          "type": "string",
+          "description": "Observability profile name (for degraded scenarios)"
+        },
+        "degraded_by": {
+          "type": "string",
+          "enum": ["source", "field", "volume"],
+          "description": "How a degraded scenario degrades. source (default): a step loses records (step unobserved); field: a record is rendered with an uncertain or missing field (JOIN_UNCERTAIN, TIME_BASIS_UNKNOWN, observer_loss); volume: the behaviour stays below the rule's threshold. The truth writer warns when a source-degraded UNOBSERVABLE expectation has all its evidence rendered."
+        },
+        "window_s": {
+          "type": "number",
+          "minimum": 10,
+          "description": "Seconds the scenario's steps spread over (default 60). Chains of several hops use more; the run matrix packs runs by total scenario time."
+        },
+        "fixture_only": {
+          "type": "boolean",
+          "description": "If true, this is a lookalike fixture not used for finding coverage"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "Source of the scenario (citation or anchor)",
+      "required": ["class"],
+      "oneOf": [
+        {
+          "required": ["class", "anchor"],
+          "properties": {
+            "class": {
+              "type": "string",
+              "enum": ["reproduced", "adapted"]
+            },
+            "anchor": {
+              "$ref": "#/definitions/anchor"
+            }
+          }
+        },
+        {
+          "required": ["class", "citation"],
+          "properties": {
+            "class": {
+              "type": "string",
+              "enum": ["external", "benign"]
+            },
+            "citation": {
+              "$ref": "#/definitions/citation"
+            }
+          }
+        }
+      ]
+    },
+    "anchor": {
+      "type": "object",
+      "description": "Reference to a dataset anchor from dataset-anchors.md",
+      "required": ["dataset", "location"],
+      "properties": {
+        "dataset": {
+          "type": "string",
+          "description": "Dataset name (LID-DS, CADETS, BETH, Kube-IDS0, CSIC, K8NTEXT, etc.)",
+          "enum": ["LID-DS", "CADETS", "BETH", "Kube-IDS0", "CSIC", "K8NTEXT", "Kubernetes-misuse"]
+        },
+        "location": {
+          "type": "string",
+          "description": "Location in dataset-anchors.md (e.g., 'section 2: CADETS sessions')"
+        },
+        "capture": {
+          "type": "string",
+          "description": "Specific capture/session/recording ID"
+        },
+        "record_ids": {
+          "type": "array",
+          "description": "Specific record IDs (capture_id or record_id) from the dataset",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "description": "Citation for external scenarios (no dataset anchor)",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "Citation source (MITRE ATT&CK, CVE, GitHub, incident report, etc.)"
+        },
+        "url": {
+          "type": "string",
+          "description": "URL to the source (where applicable)"
+        },
+        "reference": {
+          "type": "string",
+          "description": "Reference identifier (CVE-XXXX, T1234, etc.)"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "description": "A single step in the scenario",
+      "required": ["step", "action", "outcome"],
+      "properties": {
+        "step": {
+          "type": "integer",
+          "description": "Step number (1-indexed)"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action name (from actions.v0.yaml)"
+        },
+        "params": {
+          "type": "object",
+          "description": "Parameters for the action"
+        },
+        "unobserved": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["ebpf", "gateway", "audit", "kyverno", "context", "offnode"]},
+          "description": "Sources whose records of this step are lost: the build opens a short SOURCE_IDLE gap window on each such record's source scope, so the records are dropped and the gap is declared in source completeness. World effects still apply."
+        },
+        "benign": {
+          "type": "boolean",
+          "description": "A benign step inside an attack scenario (a chain's decoy): its action is not an attack (GroundTruthAction.is_attack false). Default false."
+        },
+        "follows_within_s": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Place the step within this many seconds after the previous step, instead of at its own random time in the window (a pair close in time)."
+        },
+        "float": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Floating group name: the group's steps (a decoy's exec and its action) keep their own order but are inserted at a seeded random position among the scenario's steps, after the steps they reference and the sources of links into them, before the targets of links out of them. Link labels and @step references use step numbers, so they are unchanged."
+        },
+        "after": {
+          "type": "object",
+          "required": ["step", "gap_s"],
+          "additionalProperties": false,
+          "properties": {
+            "step": {"type": "integer", "description": "Step this step is placed after"},
+            "gap_s": {
+            "oneOf": [
+              {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 2, "maxItems": 2},
+              {"type": "string", "pattern": "^(accept_delay|reconnect_delay)([*][1-9])?([+](accept_delay|reconnect_delay)([*][1-9])?)*$"}
+            ]
+          }
+          },
+          "description": "Place the step this gap after the named step: [lo, hi] seconds (uniform) a sum of mtgen.netmodel delays joined by +, each accept_delay (a connect's accept) or reconnect_delay (a fixed-source-port reconnect after the previous accept: the probe's exchange, then an accept delay; G2), with an optional *K for K draws."
+        },
+        "repeat": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Render the step this many times as a burst within the step duration, as one action; \"{i}\" in a string parameter becomes the copy number (1..repeat). Default 1."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "Expected outcome of the step",
+          "enum": ["success", "attempt_failed"]
+        },
+        "expects": {
+          "type": "array",
+          "description": "List of findings expected from this step",
+          "items": {
+            "$ref": "#/definitions/expectation"
+          }
+        }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "description": "Expected finding from a step",
+      "required": ["finding", "state"],
+      "properties": {
+        "finding": {
+          "type": "string",
+          "description": "Finding identifier (A1, B2, H4, etc.)",
+          "pattern": "^[A-H][0-9][a-z]?$"
+        },
+        "state": {
+          "type": "string",
+          "description": "Expected state of the finding",
+          "enum": ["PRESENT", "ABSENT", "UNOBSERVABLE"]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this finding is expected to be in this state"
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "description": "Expected actionlink between two steps (provenance/causality)",
+      "required": ["from", "to", "witness"],
+      "properties": {
+        "from": {
+          "type": "integer",
+          "description": "Step number (source of the link)"
+        },
+        "to": {
+          "type": "integer",
+          "description": "Step number (target of the link)"
+        },
+        "witness": {
+          "type": "string",
+          "description": "WitnessType name (NETWORK_FLOW, REQUEST_IDENTITY, PROCESS_ANCESTRY, etc.)"
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected witness status. UNOBSERVABLE: the steps are causally linked but no available source records an instance witness for the link, so a detector should abstain.",
+          "enum": ["PRESENT", "ABSENT", "UNOBSERVABLE"]
+        },
+        "gap_of": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Twin link: place its floating endpoint so the link spans the time between these two steps (x0.75-1.25), the gap of the real link it mirrors."
+        },
+        "gap_s": {
+          "oneOf": [
+            {"type": "array", "items": {"type": "number", "minimum": 0}, "minItems": 2, "maxItems": 2},
+            {"type": "string", "pattern": "^(accept_delay|reconnect_delay)([*][1-9])?([+](accept_delay|reconnect_delay)([*][1-9])?)*$"}
+          ],
+          "description": "Twin link: place its floating endpoint so the link spans a uniform draw from [lo, hi] seconds, or an accept delay (accept_delay, mtgen.netmodel)."
+        },
+        "contradicted_by": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 1,
+          "description": "Steps whose net.connect is the link's contradiction (a port-reuse nonlink: the socket that reused the tuple before the accept, G2). When every such step loses its connect, truth labels the link UNOBSERVABLE."
+        },
+        "ordering": {
+          "type": "boolean",
+          "description": "false: a truth row only. Step placement ignores it (by default a link's target is placed after its source), so a row added to a built dataset leaves its streams as they are, and two rows between the same steps in both directions (benign continuity in either order) do not form a cycle."
+        },
+        "shared_keys": {
+          "type": "array",
+          "description": "Shared key components for the witness (e.g., [FlowId], [lineage_id])",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "description": "A variant of the scenario (different parameterization or rule-shaping)",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Variant identifier (unique within scenario)"
+        },
+        "rulebook_shaped": {
+          "type": "boolean",
+          "description": "Whether this variant is shaped by the rulebook predicates (attack scenarios must have at least one false)"
+        },
+        "changes": {
+          "type": "array",
+          "description": "Parameter overrides from the base scenario, applied by the scenario engine: each sets step N's params.key.",
+          "items": {
+            "type": "object",
+            "required": ["field", "value"],
+            "properties": {
+              "field": {"type": "string", "pattern": "^step[.][0-9]+[.]params[.][A-Za-z_]+$"},
+              "value": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}

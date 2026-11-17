@@ -1,0 +1,10 @@
+# No-History ablation under 40 % transit loss (worklog Q-3): loss-transit-40.yaml (same seed and
+# fault) applied to the run's No-History identity variant (mtcore.exp3.nohistory).
+version: faultplan.v0
+seed: 3401
+base_variant: no_history
+faults:
+  - id: loss-transit-40
+    kind: loss
+    stage: transit
+    rate: 0.4

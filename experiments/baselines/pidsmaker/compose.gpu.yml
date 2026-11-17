@@ -1,0 +1,12 @@
+# Adds one GPU to the PIDSMaker app (as PIDSMaker's own compose-pidsmaker.yml does).
+#   docker compose -f compose.aws.yml -f compose.gpu.yml up -d
+# Held-out runs use the CPU-only m7i.8xlarge analysis host (decision 2026-11-11) and leave this out.
+services:
+  app:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -1,0 +1,53 @@
+step	phase	rep	unit	system	config	workload	workers	timed	exit	wall_s	units	finished	capped	sum_unit_wall_s	sum_unit_cpu_s	max_unit_rss_mb	go_seconds	findings	pairs_tested	note
+prep.stub	prep	0	stub	stub	stub	-	-	False	0	0.1	1	1	0	0.015	0.0	11.7	-	-	-	prep
+accuracy.ref_m1	accuracy	0	ref_m1	go	exhaustive	m1	2	False	0	9.4	8	8	0	18.239	17.92	1202.4	7.74902	59	616	
+accuracy.full_m1	accuracy	0	full_m1	go	full	m1	2	False	0	18.2	8	8	0	35.41	35.1	1202.4	7.459125	59	608	
+accuracy.noindex_m1	accuracy	0	noindex_m1	go	no_index	m1	2	False	0	10.2	8	8	0	19.839	19.59	1202.5	8.522871	59	616	
+accuracy.unbounded_m1	accuracy	0	unbounded_m1	go	unbounded	m1	2	False	0	10.8	8	8	0	20.951	20.61	1202.4	8.942028	59	608	
+accuracy.reduced_k_m1	accuracy	0	reduced_k_m1	go	reduced_k	m1	2	False	0	9.5	8	8	0	18.339	17.99	1202.4	7.723284	59	608	
+accuracy.reduced_l_m1	accuracy	0	reduced_l_m1	go	reduced_l	m1	2	False	0	10.8	8	8	0	20.947	20.54	1202.6	8.922754	59	608	
+accuracy.reduced_t_m1	accuracy	0	reduced_t_m1	go	reduced_t	m1	2	False	0	9.7	8	8	0	18.839	18.56	1202.4	8.26054	59	608	
+accuracy.ref_m2	accuracy	0	ref_m2	go	exhaustive	m2	2	False	0	12.2	4	4	0	21.29	20.06	2194.5	9.989255	59	616	
+accuracy.full_m2	accuracy	0	full_m2	go	full	m2	2	False	0	10.0	4	4	0	19.387	19.22	2194.5	9.17159	59	608	
+accuracy.noindex_m2	accuracy	0	noindex_m2	go	no_index	m2	2	False	0	10.0	4	4	0	19.487	19.37	2194.4	9.196822	59	616	
+accuracy.full_m4	accuracy	0	full_m4	go	full	m4	2	False	0	10.8	2	2	0	20.848	20.23	3612.6	9.894452	59	608	
+accuracy.noindex_m4	accuracy	0	noindex_m4	go	no_index	m4	2	False	0	18.9	2	2	0	31.973	18.23	3612.3	8.725054	59	616	
+accuracy.stub.train	accuracy	0	stub	stub	stub	-	-	True	0	0.3	1	1	0	0.164	0.12	11.8	-	-	-	train
+accuracy.stub	accuracy	0	stub	stub	stub	-	-	False	0	0.2	1	1	0	0.064	0.04	11.9	-	-	-	detect
+accuracy.stub_capped	accuracy	0	stub_capped	stub_slow	stub_slow	-	-	False	0	5.1	1	0	1	5.0	-	-	-	-	-	detect
+rep1.full_m1	rep1	1	full_m1	go	full	m1	2	True	0	9.8	8	8	0	18.988	18.69	1202.3	8.010697	59	608	
+rep1.noindex_m1	rep1	1	noindex_m1	go	no_index	m1	2	True	0	9.6	8	8	0	18.534	18.19	1202.1	7.784908	59	616	
+rep1.unbounded_m1	rep1	1	unbounded_m1	go	unbounded	m1	2	True	0	9.3	8	8	0	17.933	17.67	1202.1	7.575581	59	608	
+rep1.reduced_k_m1	rep1	1	reduced_k_m1	go	reduced_k	m1	2	True	0	9.1	8	8	0	17.632	17.39	1202.1	7.457575	59	608	
+rep1.reduced_l_m1	rep1	1	reduced_l_m1	go	reduced_l	m1	2	True	0	9.3	8	8	0	18.133	17.85	1202.0	7.677688	59	608	
+rep1.reduced_t_m1	rep1	1	reduced_t_m1	go	reduced_t	m1	2	True	0	10.9	8	8	0	21.32	20.62	1202.2	9.426359	59	608	
+rep1.full_m2	rep1	1	full_m2	go	full	m2	2	True	0	9.7	4	4	0	18.88	18.79	2194.1	8.922745	59	608	
+rep1.noindex_m2	rep1	1	noindex_m2	go	no_index	m2	2	True	0	10.0	4	4	0	19.332	19.11	2194.1	8.983884	59	616	
+rep1.full_m4	rep1	1	full_m4	go	full	m4	2	True	0	11.3	2	2	0	22.07	21.81	3612.2	10.356455	59	608	
+rep1.noindex_m4	rep1	1	noindex_m4	go	no_index	m4	2	True	0	12.5	2	2	0	22.275	20.51	3611.8	10.014136	59	616	
+rep1.stub	rep1	1	stub	stub	stub	-	-	True	0	0.3	1	1	0	0.064	0.04	11.9	-	-	-	detect
+rep1.stub_capped	rep1	1	stub_capped	stub_slow	stub_slow	-	-	True	0	5.1	1	0	1	5.0	-	-	-	-	-	detect
+rep2.reduced_l_m1	rep2	2	reduced_l_m1	go	reduced_l	m1	2	True	0	11.0	8	8	0	19.889	18.15	1202.1	7.745293	59	608	
+rep2.reduced_t_m1	rep2	2	reduced_t_m1	go	reduced_t	m1	2	True	0	9.9	8	8	0	18.938	18.58	1202.1	8.266633	59	608	
+rep2.full_m2	rep2	2	full_m2	go	full	m2	2	True	0	9.9	4	4	0	19.183	19.0	2194.1	9.028122	59	608	
+rep2.noindex_m2	rep2	2	noindex_m2	go	no_index	m2	2	True	0	10.3	4	4	0	19.534	19.3	2194.0	9.163366	59	616	
+rep2.full_m4	rep2	2	full_m4	go	full	m4	2	True	0	11.9	2	2	0	21.813	20.08	3611.8	9.833138	59	608	
+rep2.noindex_m4	rep2	2	noindex_m4	go	no_index	m4	2	True	0	18.3	2	2	0	29.772	18.4	3612.0	8.853536	59	616	
+rep2.stub	rep2	2	stub	stub	stub	-	-	True	0	0.2	1	1	0	0.064	0.04	11.9	-	-	-	detect
+rep2.stub_capped	rep2	2	stub_capped	stub_slow	stub_slow	-	-	True	0	5.1	1	0	1	5.0	-	-	-	-	-	detect
+rep2.full_m1	rep2	2	full_m1	go	full	m1	2	True	0	9.6	8	8	0	18.586	18.17	1202.0	7.822779	59	608	
+rep2.noindex_m1	rep2	2	noindex_m1	go	no_index	m1	2	True	0	9.4	8	8	0	18.285	17.97	1202.1	7.662948	59	616	
+rep2.unbounded_m1	rep2	2	unbounded_m1	go	unbounded	m1	2	True	0	9.8	8	8	0	18.687	18.33	1202.1	7.857222	59	608	
+rep2.reduced_k_m1	rep2	2	reduced_k_m1	go	reduced_k	m1	2	True	0	9.6	8	8	0	18.437	17.96	1202.0	7.642715	59	608	
+rep3.full_m4	rep3	3	full_m4	go	full	m4	2	True	0	10.2	2	2	0	19.96	19.87	3612.0	9.768214	59	608	
+rep3.noindex_m4	rep3	3	noindex_m4	go	no_index	m4	2	True	0	16.7	2	2	0	31.726	18.57	3612.1	9.013017	59	616	
+rep3.stub	rep3	3	stub	stub	stub	-	-	True	0	0.2	1	1	0	0.064	0.04	11.9	-	-	-	detect
+rep3.stub_capped	rep3	3	stub_capped	stub_slow	stub_slow	-	-	True	0	5.1	1	0	1	5.0	-	-	-	-	-	detect
+rep3.full_m1	rep3	3	full_m1	go	full	m1	2	True	0	9.6	8	8	0	18.637	18.18	1202.1	7.766909	59	608	
+rep3.noindex_m1	rep3	3	noindex_m1	go	no_index	m1	2	True	0	9.5	8	8	0	18.285	17.94	1202.0	7.672714	59	616	
+rep3.unbounded_m1	rep3	3	unbounded_m1	go	unbounded	m1	2	True	0	9.5	8	8	0	18.235	17.89	1202.2	7.667309	59	608	
+rep3.reduced_k_m1	rep3	3	reduced_k_m1	go	reduced_k	m1	2	True	0	9.6	8	8	0	18.638	18.21	1202.1	7.801219	59	608	
+rep3.reduced_l_m1	rep3	3	reduced_l_m1	go	reduced_l	m1	2	True	0	9.5	8	8	0	18.283	17.89	1202.2	7.633746	59	608	
+rep3.reduced_t_m1	rep3	3	reduced_t_m1	go	reduced_t	m1	2	True	0	9.5	8	8	0	18.287	17.92	1202.2	7.95659	59	608	
+rep3.full_m2	rep3	3	full_m2	go	full	m2	2	True	0	9.8	4	4	0	19.033	18.81	2194.0	8.914967	59	608	
+rep3.noindex_m2	rep3	3	noindex_m2	go	no_index	m2	2	True	0	10.0	4	4	0	19.434	19.06	2194.1	8.964758	59	616	

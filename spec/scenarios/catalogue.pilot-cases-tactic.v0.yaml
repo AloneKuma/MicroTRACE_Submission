@@ -1,0 +1,257 @@
+# MicroTRACE scenario catalogue overlay: No-Tactic cases for the pilot-cases
+# add-on set (docs/plans/exp2-no-tactic-cases-plan.md, S1).
+#
+# Status: draft
+#
+# A separate file, so catalogue.pilot-cases.v0.yaml keeps the hash its 40
+# runs recorded. Runs that use these scenarios name both overlays and set the
+# same generator flags as pilot-cases.
+#
+# D-4: entries are reviewed by someone other than their author.
+
+version: catalogue.pilot-cases-tactic.v0
+status: draft
+coverage_required: false
+author: "claude (exp2-no-tactic-cases-plan S1, 2026-10-27)"
+reviewer: "pending (D-4)"
+
+scenarios:
+  # ========== No-Tactic: an ancestor's lookalikes (plan section 3) ==========
+
+  - id: tactic_ancestor_lookalike
+    kind: attack
+    title: "No-Tactic: an agent steals the token and exfiltrates while its parent app connects out"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1528 Steal Application Access Token; T1041 Exfiltration Over C2 Channel"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (exp2-no-tactic-cases-plan S1, 2026-10-27)"
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    adaptation_note: |
+      An agent dropped through the application (a child process of the app,
+      as after an RCE) reads the ServiceAccount token (D1, credential access)
+      and later reads /etc/shadow and sends it out (H4, exfiltration): one
+      forward step along the ATT&CK tactic order. The upload goes to a
+      destination already in the workload's H2 set, so the agent's chain has
+      no H2. Just before it, the application itself, the agent's parent,
+      connects to two destinations new to the workload (a telemetry endpoint
+      and a CDN; H2, no tactic). Ancestry holds from the app to the agent, so
+      the correlator can confirm app H2 -> agent H4; the app's connections
+      are a separate benign incident, and the pair carries no truth link (a
+      hard nonlink needs a witness that does not hold, verify
+      link_witness), so a retained path through it is a false chain. The
+      tactic weight ranks the forward D1 -> H4 above the unmapped lookalikes;
+      without it the tighter lookalikes win the K path slots (plan T2).
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.cache/agent
+          argv: [/tmp/.cache/agent]
+        outcome: success
+        expects: []
+      - step: 2
+        action: read_token_file
+        intended_tactic: CREDENTIAL_ACCESS
+        params:
+          reader_process: "@step1.process"
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers"
+      - step: 3
+        action: connect_external
+        benign: true
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.87
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The application connects to a telemetry endpoint new to the workload: a real unseen destination, not part of the chain"
+      - step: 4
+        action: connect_external
+        benign: true
+        follows_within_s: 1
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.91
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The application connects to a CDN new to the workload: a real unseen destination, not part of the chain"
+      - step: 5
+        action: read_sensitive_file
+        follows_within_s: 2
+        params:
+          reader_process: "@step1.process"
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects:
+          - finding: H4
+            state: UNOBSERVABLE
+            reason: "Read alone without outbound connect"
+      - step: 6
+        action: connect_external
+        follows_within_s: 1
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []          # a destination in the workload's H2 set
+      - step: 7
+        action: egress_transfer
+        follows_within_s: 1
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          destination: 203.0.113.10
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+    links:
+      - from: 2
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the agent that stole the token exfiltrates"
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: tactic_ancestor_c2
+    kind: attack
+    title: "No-Tactic mirror: the application itself beacons, fetches a stage and exfiltrates"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1071 Application Layer Protocol; T1041 Exfiltration Over C2 Channel"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (exp2-no-tactic-cases-plan S1, 2026-10-27)"
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    adaptation_note: |
+      The mirror of tactic_ancestor_lookalike (plan decision T-b,
+      2026-10-27): the same steps and timing, with the H2 connections true
+      chain steps instead of benign ones. The application process itself is
+      compromised (an in-memory implant): it beacons to a C2 server and
+      fetches a stage from a second one (H2, no tactic, both destinations
+      new to the workload), then reads /etc/shadow and sends it out (H4). A
+      true chain that starts with unmapped steps, where the tactic weight
+      can only lower its rank; there is no forward-mapped chain competing
+      with it, so it does not repeat the lookalike case with the opposite
+      label (which would cancel it by construction, since the correlator
+      sees the same events).
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.87
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The implant beacons to a C2 server new to the workload"
+      - step: 2
+        action: connect_external
+        follows_within_s: 1
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.91
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The implant fetches a stage from a second server new to the workload"
+      - step: 3
+        action: read_sensitive_file
+        follows_within_s: 2
+        params:
+          reader_process: compromised_pod
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects:
+          - finding: H4
+            state: UNOBSERVABLE
+            reason: "Read alone without outbound connect"
+      - step: 4
+        action: connect_external
+        follows_within_s: 1
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []          # a destination in the workload's H2 set
+      - step: 5
+        action: egress_transfer
+        follows_within_s: 1
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          destination: 203.0.113.10
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+    links:
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant that beaconed exfiltrates"
+      - from: 2
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant that fetched the stage exfiltrates"
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant beacons, then fetches its stage"
+    variants:
+      - id: v1
+        rulebook_shaped: false

@@ -1,0 +1,1505 @@
+{
+ "trace_version": "trace-v0",
+ "note": "Synthetic schema example, not observed data. UIDs, digests, and times are invented identifiers; no parameter value is chosen (UNFROZEN-EXAMPLE).",
+ "records": [
+  {
+   "label": "R1 token.file_index census entry",
+   "topic": "raw.ebpf.v0",
+   "key_hex": "4d540000010101000000066e6f64652d31",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "node-sensor",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_EBPF",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawEbpf": {
+     "nodeId": "node-1",
+     "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+     "nodeSeq": "70",
+     "monotonicNs": "912398000000",
+     "captureManifestVersion": "capture-manifest.v0",
+     "eventFamily": "token.file_index",
+     "result": "SUCCESS",
+     "process": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 812,
+      "startTimeNs": "1200000000"
+     },
+     "readerClass": "READER_HOST_PROCESS",
+     "projectedIndex": {
+      "version": {
+       "ownerPodUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "volumeName": "kube-api-access-x7k2p",
+       "versionDir": "..2026_09_26_09_40_00.3141592653",
+       "fileName": "token"
+      },
+      "dev": "2049",
+      "ino": "1573005",
+      "current": true
+     }
+    },
+    "logicalId": "ev_9160a1799481d0a08b6e12d39b1fd404"
+   }
+  },
+  {
+   "label": "R2 token read (file.read)",
+   "topic": "raw.ebpf.v0",
+   "key_hex": "4d540000010101000000066e6f64652d31",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "node-sensor",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_EBPF",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawEbpf": {
+     "nodeId": "node-1",
+     "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+     "nodeSeq": "71",
+     "monotonicNs": "912400000000",
+     "captureManifestVersion": "capture-manifest.v0",
+     "eventFamily": "file.read",
+     "result": "SUCCESS",
+     "process": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4217,
+      "startTimeNs": "912399000000"
+     },
+     "parent": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4100,
+      "startTimeNs": "912345678901"
+     },
+     "lineageRoot": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4100,
+      "startTimeNs": "912345678901"
+     },
+     "container": {
+      "containerId": "containerd://7f3b0c",
+      "cgroupId": "91234",
+      "containerName": "checkout"
+     },
+     "readerClass": "READER_POD_PROCESS",
+     "returnValue": "1043",
+     "fileAccess": {
+      "op": "FILE_READ",
+      "fd": 7,
+      "bytes": "1043",
+      "file": {
+       "dev": "2049",
+       "ino": "1573005",
+       "mntNsInum": "4026532801",
+       "mntId": 1422,
+       "resolvedPath": "/var/run/secrets/kubernetes.io/serviceaccount/..2026_09_26_09_40_00.3141592653/token",
+       "pathAsOpened": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+       "projected": {
+        "ownerPodUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+        "volumeName": "kube-api-access-x7k2p",
+        "versionDir": "..2026_09_26_09_40_00.3141592653",
+        "fileName": "token"
+       }
+      }
+     }
+    },
+    "logicalId": "ev_f256693e22b3f053ce096cba02dd2d20"
+   }
+  },
+  {
+   "label": "R3 executable-mode change on a mounted volume (file.mutation)",
+   "topic": "raw.ebpf.v0",
+   "key_hex": "4d540000010101000000066e6f64652d31",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "node-sensor",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_EBPF",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawEbpf": {
+     "nodeId": "node-1",
+     "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+     "nodeSeq": "72",
+     "monotonicNs": "912410000000",
+     "captureManifestVersion": "capture-manifest.v0",
+     "eventFamily": "file.mutation",
+     "result": "SUCCESS",
+     "process": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4217,
+      "startTimeNs": "912399000000"
+     },
+     "parent": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4100,
+      "startTimeNs": "912345678901"
+     },
+     "lineageRoot": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "tgid": 4100,
+      "startTimeNs": "912345678901"
+     },
+     "container": {
+      "containerId": "containerd://7f3b0c",
+      "cgroupId": "91234",
+      "containerName": "checkout"
+     },
+     "readerClass": "READER_POD_PROCESS",
+     "returnValue": "0",
+     "fileMutation": {
+      "op": "CHMOD",
+      "newMode": 493,
+      "executableAfter": true,
+      "file": {
+       "dev": "2050",
+       "ino": "88113",
+       "mntNsInum": "4026532801",
+       "mntId": 1430,
+       "resolvedPath": "/work/cache/helper",
+       "pathAsOpened": "/work/cache/helper"
+      }
+     }
+    },
+    "logicalId": "ev_96409aae3566a7133887efa8cf109490"
+   }
+  },
+  {
+   "label": "R4 Kyverno audit-mode FAIL",
+   "topic": "raw.kyverno.v0",
+   "key_hex": "4d5400000401040000002461316437633365392d326234662d346336642d386530612d303030303030303030303931",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "kyverno-exporter",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_KYVERNO",
+    "source": "KYVERNO",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawKyverno": {
+     "admissionRequestUid": "a1d7c3e9-2b4f-4c6d-8e0a-000000000091",
+     "resourceUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+     "resourceKind": "Pod",
+     "namespace": "shop",
+     "resourceName": "checkout-7d9f-abcde",
+     "policy": "require-signed-images",
+     "rule": "verify-signature",
+     "verdict": "FAIL",
+     "enforcementAuditMode": true,
+     "imageDigests": [
+      "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d"
+     ],
+     "dryRun": false,
+     "admissionTime": "2026-09-26T09:39:58Z",
+     "reportUid": "b2c4e6f8-0000-4000-8000-0000000000a1",
+     "reportObservedTime": "2026-09-26T09:40:03Z",
+     "kyvernoVersion": "UNPINNED"
+    },
+    "logicalId": "ev_ccfb7043c9d5ebd250dd321020c7197f"
+   }
+  },
+  {
+   "label": "R5 TokenRequest audit event (issued-credential-id annotation)",
+   "topic": "raw.audit.v0",
+   "key_hex": "4d5400000201020000002439633166306532642d336234612d346335642d396536662d303030303030303030303432",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "audit-collector",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_AUDIT",
+    "source": "AUDIT",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawAudit": {
+     "auditId": "9c1f0e2d-3b4a-4c5d-9e6f-000000000042",
+     "stage": "ResponseComplete",
+     "level": "Metadata",
+     "requestUri": "/api/v1/namespaces/shop/serviceaccounts/checkout-sa/token",
+     "verb": "create",
+     "user": {
+      "username": "system:node:node-1",
+      "groups": [
+       "system:nodes",
+       "system:authenticated"
+      ]
+     },
+     "sourceIps": [
+      "10.0.0.11"
+     ],
+     "userAgent": "kubelet/UNPINNED",
+     "objectRef": {
+      "resource": "serviceaccounts",
+      "subresource": "token",
+      "namespace": "shop",
+      "name": "checkout-sa",
+      "apiVersion": "v1"
+     },
+     "responseCode": 201,
+     "annotations": {
+      "authentication.kubernetes.io/issued-credential-id": "JTI=4f0c2a7e-5d6b-4e8f-9a1b-000000000007"
+     },
+     "requestReceivedTimestamp": "2026-09-26T09:39:59.100Z",
+     "stageTimestamp": "2026-09-26T09:39:59.130Z",
+     "policyVersion": "audit-policy.v0",
+     "position": {
+      "route": "LOG_FILE_TAIL",
+      "fileDev": "2051",
+      "fileIno": "5521",
+      "fileOffset": "88213"
+     }
+    },
+    "logicalId": "ev_e6e6e840af68ac9406a5b0f58a96dff1"
+   }
+  },
+  {
+   "label": "R6 gateway observation",
+   "topic": "raw.gateway.v0",
+   "key_hex": "4d540000030103000000067265712d3137",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "gateway-observer",
+    "producerVersion": "0.0.0-design",
+    "kind": "RAW_GATEWAY",
+    "source": "GATEWAY",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "rawGateway": {
+     "requestId": "req-17",
+     "route": "/checkout",
+     "method": "POST",
+     "authority": "shop.example",
+     "path": "/checkout",
+     "peerIp": "198.51.100.23",
+     "responseStatus": 400,
+     "responseBodyBytes": "512",
+     "matches": [
+      {
+       "patternId": "sqli-union",
+       "patternSetVersion": "P_A:UNFROZEN-EXAMPLE",
+       "location": "REQUEST_BODY",
+       "chunkIndex": 0
+      }
+     ],
+     "bodyTruncated": false,
+     "observerLoss": false,
+     "gatewayBuild": "UNPINNED"
+    },
+    "logicalId": "ev_fcbb1499c0746b1463d82aec6286ea44"
+   }
+  },
+  {
+   "label": "C1 Pod watch observation (context)",
+   "topic": "context.cluster.v0",
+   "key_hex": "4d5400000501050000002433633965316432612d376136312d346630652d396431312d303030303030303061303037",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "context-collector",
+    "producerVersion": "0.0.0-design",
+    "kind": "CONTEXT_OBSERVATION",
+    "source": "CLUSTER_CONTEXT",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "contextObservation": {
+     "apiGroup": "",
+     "kind": "Pod",
+     "namespace": "shop",
+     "name": "checkout-7d9f-abcde",
+     "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+     "resourceVersion": "48210",
+     "changeType": "MODIFIED",
+     "observedTime": "2026-09-26T09:40:02Z",
+     "watchStreamId": "pods-watch-1",
+     "watchStreamSeq": "311",
+     "pod": {
+      "nodeName": "node-1",
+      "podIps": [
+       "10.244.1.17"
+      ],
+      "serviceAccount": "checkout-sa",
+      "containers": [
+       {
+        "name": "checkout",
+        "containerId": "containerd://7f3b0c",
+        "restartCount": 0,
+        "startedAt": "2026-09-26T09:40:01Z",
+        "imageId": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d"
+       }
+      ]
+     }
+    },
+    "logicalId": "ev_145e51300b35b94406c21e7a66024811"
+   }
+  },
+  {
+   "label": "N2 normalized token read",
+   "topic": "agent.D.read.v0",
+   "key_hex": "4d5400000a020c0000002433633965316432612d376136312d346630652d396431312d3030303030303030613030370d000000156b7562652d6170692d6163636573732d78376b3270",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "normalizer",
+    "producerVersion": "0.0.0-design",
+    "kind": "NORMALIZED_EVENT",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "normalizedEvent": {
+     "eventId": "ev_f65cfcaac6dfc640bd00e0e85fa5efb0",
+     "source": "EBPF",
+     "sourceNativeId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/71",
+     "sourceStage": "file.read",
+     "time": {
+      "eventTimeBasis": "EBPF_MONOTONIC_CORRECTED",
+      "clockModelVersion": "clock-model:UNFROZEN-EXAMPLE",
+      "eventTimeUncertain": true,
+      "eventTime": "2026-09-26T10:00:01Z",
+      "ingestTime": "2026-09-26T10:00:01.400Z"
+     },
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "PROCESS_LINEAGE",
+       "uid": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "ebpf": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "nodeSeq": "71",
+      "monotonicNs": "912400000000",
+      "captureManifestVersion": "capture-manifest.v0",
+      "eventFamily": "file.read",
+      "result": "SUCCESS",
+      "process": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4217,
+       "startTimeNs": "912399000000"
+      },
+      "parent": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4100,
+       "startTimeNs": "912345678901"
+      },
+      "lineageRoot": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4100,
+       "startTimeNs": "912345678901"
+      },
+      "container": {
+       "containerId": "containerd://7f3b0c",
+       "cgroupId": "91234",
+       "containerName": "checkout"
+      },
+      "readerClass": "READER_POD_PROCESS",
+      "returnValue": "1043",
+      "fileAccess": {
+       "op": "FILE_READ",
+       "fd": 7,
+       "bytes": "1043",
+       "file": {
+        "dev": "2049",
+        "ino": "1573005",
+        "mntNsInum": "4026532801",
+        "mntId": 1422,
+        "resolvedPath": "/var/run/secrets/kubernetes.io/serviceaccount/..2026_09_26_09_40_00.3141592653/token",
+        "pathAsOpened": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+        "projected": {
+         "ownerPodUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+         "volumeName": "kube-api-access-x7k2p",
+         "versionDir": "..2026_09_26_09_40_00.3141592653",
+         "fileName": "token"
+        }
+       }
+      }
+     },
+     "normalizerVersion": "norm-0",
+     "contextVersion": "ctx-hist:UNFROZEN-EXAMPLE",
+     "actionId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/71",
+     "ebpfDerived": {
+      "podUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "containerName": "checkout",
+      "lineageId": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+      "tokenFile": {
+       "ownerPodUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "volumeName": "kube-api-access-x7k2p",
+       "versionDir": "..2026_09_26_09_40_00.3141592653",
+       "fileName": "token"
+      }
+     },
+     "captureManifestVersion": "capture-manifest.v0"
+    },
+    "logicalId": "ev_f65cfcaac6dfc640bd00e0e85fa5efb0"
+   }
+  },
+  {
+   "label": "N3 normalized executable-mode change",
+   "topic": "agent.E.v0",
+   "key_hex": "4d5400000c020c0000002433633965316432612d376136312d346630652d396431312d3030303030303030613030370f00000008636865636b6f7574",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "normalizer",
+    "producerVersion": "0.0.0-design",
+    "kind": "NORMALIZED_EVENT",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "normalizedEvent": {
+     "eventId": "ev_1e0576634f85be938f984ca35c3e4c1c",
+     "source": "EBPF",
+     "sourceNativeId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/72",
+     "sourceStage": "file.mutation",
+     "time": {
+      "eventTimeBasis": "EBPF_MONOTONIC_CORRECTED",
+      "clockModelVersion": "clock-model:UNFROZEN-EXAMPLE",
+      "eventTimeUncertain": true,
+      "eventTime": "2026-09-26T10:00:11Z",
+      "ingestTime": "2026-09-26T10:00:11.300Z"
+     },
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "PROCESS_LINEAGE",
+       "uid": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "IMAGE",
+       "uid": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d",
+       "strengthClass": "STRENGTH_MEDIUM"
+      }
+     ],
+     "ebpf": {
+      "nodeId": "node-1",
+      "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+      "nodeSeq": "72",
+      "monotonicNs": "912410000000",
+      "captureManifestVersion": "capture-manifest.v0",
+      "eventFamily": "file.mutation",
+      "result": "SUCCESS",
+      "process": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4217,
+       "startTimeNs": "912399000000"
+      },
+      "parent": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4100,
+       "startTimeNs": "912345678901"
+      },
+      "lineageRoot": {
+       "nodeId": "node-1",
+       "bootId": "5f2a9c1e-0000-4000-8000-00000000b001",
+       "tgid": 4100,
+       "startTimeNs": "912345678901"
+      },
+      "container": {
+       "containerId": "containerd://7f3b0c",
+       "cgroupId": "91234",
+       "containerName": "checkout"
+      },
+      "readerClass": "READER_POD_PROCESS",
+      "returnValue": "0",
+      "fileMutation": {
+       "op": "CHMOD",
+       "newMode": 493,
+       "executableAfter": true,
+       "file": {
+        "dev": "2050",
+        "ino": "88113",
+        "mntNsInum": "4026532801",
+        "mntId": 1430,
+        "resolvedPath": "/work/cache/helper",
+        "pathAsOpened": "/work/cache/helper"
+       }
+      }
+     },
+     "normalizerVersion": "norm-0",
+     "contextVersion": "ctx-hist:UNFROZEN-EXAMPLE",
+     "actionId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/72",
+     "ebpfDerived": {
+      "podUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "containerName": "checkout",
+      "lineageId": "ln_b86b3062dd671f9aeb317f2b3ae4bb36"
+     },
+     "captureManifestVersion": "capture-manifest.v0"
+    },
+    "logicalId": "ev_1e0576634f85be938f984ca35c3e4c1c"
+   }
+  },
+  {
+   "label": "N4 normalized admission decision",
+   "topic": "agent.E.v0",
+   "key_hex": "4d5400000c020c0000002433633965316432612d376136312d346630652d396431312d3030303030303030613030370f00000008636865636b6f7574",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "normalizer",
+    "producerVersion": "0.0.0-design",
+    "kind": "NORMALIZED_EVENT",
+    "source": "KYVERNO",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "normalizedEvent": {
+     "eventId": "ev_2e00bb3ab0ba14c02178f4cf42f73ce0",
+     "source": "KYVERNO",
+     "sourceNativeId": "a1d7c3e9-2b4f-4c6d-8e0a-000000000091/require-signed-images/verify-signature",
+     "sourceStage": "decision",
+     "time": {
+      "sourceTime": "2026-09-26T09:39:58Z",
+      "eventTime": "2026-09-26T09:39:58Z",
+      "ingestTime": "2026-09-26T09:40:03.200Z",
+      "eventTimeBasis": "KYVERNO_ADMISSION"
+     },
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "IMAGE",
+       "uid": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d",
+       "strengthClass": "STRENGTH_MEDIUM"
+      }
+     ],
+     "kyverno": {
+      "admissionRequestUid": "a1d7c3e9-2b4f-4c6d-8e0a-000000000091",
+      "resourceUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "resourceKind": "Pod",
+      "namespace": "shop",
+      "resourceName": "checkout-7d9f-abcde",
+      "policy": "require-signed-images",
+      "rule": "verify-signature",
+      "verdict": "FAIL",
+      "enforcementAuditMode": true,
+      "imageDigests": [
+       "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d"
+      ],
+      "dryRun": false,
+      "admissionTime": "2026-09-26T09:39:58Z",
+      "reportUid": "b2c4e6f8-0000-4000-8000-0000000000a1",
+      "reportObservedTime": "2026-09-26T09:40:03Z",
+      "kyvernoVersion": "UNPINNED"
+     },
+     "normalizerVersion": "norm-0",
+     "contextVersion": "ctx-hist:UNFROZEN-EXAMPLE",
+     "actionId": "a1d7c3e9-2b4f-4c6d-8e0a-000000000091",
+     "admissionDerived": {
+      "podUid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "containerName": "checkout"
+     },
+     "completeness": {
+      "gaps": [
+       {
+        "reason": "CONDITIONAL_JOIN_UNVALIDATED",
+        "scope": "join=admission-pod-uid",
+        "detail": "KYV-POD-UID-DRYRUN and KYV-ADMISSION-TIME not run"
+       }
+      ]
+     }
+    },
+    "logicalId": "ev_2e00bb3ab0ba14c02178f4cf42f73ce0"
+   }
+  },
+  {
+   "label": "N5 normalized TokenRequest (issuance side of the JTI join)",
+   "topic": "agent.D.use.v0",
+   "key_hex": "4d5400000b010e0000002434663063326137652d356436622d346538662d396131622d303030303030303030303037",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "normalizer",
+    "producerVersion": "0.0.0-design",
+    "kind": "NORMALIZED_EVENT",
+    "source": "AUDIT",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "normalizedEvent": {
+     "eventId": "ev_b773be158975d3d6a67117f915bdc2e9",
+     "source": "AUDIT",
+     "sourceNativeId": "9c1f0e2d-3b4a-4c5d-9e6f-000000000042",
+     "sourceStage": "ResponseComplete",
+     "time": {
+      "sourceTime": "2026-09-26T09:39:59.130Z",
+      "eventTime": "2026-09-26T09:39:59.130Z",
+      "ingestTime": "2026-09-26T09:39:59.600Z",
+      "eventTimeBasis": "AUDIT_STAGE"
+     },
+     "entities": [
+      {
+       "type": "AUDIT_ACTION",
+       "uid": "9c1f0e2d-3b4a-4c5d-9e6f-000000000042",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "SERVICE_ACCOUNT",
+       "namespace": "shop",
+       "name": "checkout-sa",
+       "strengthClass": "STRENGTH_CONTEXT"
+      }
+     ],
+     "audit": {
+      "auditId": "9c1f0e2d-3b4a-4c5d-9e6f-000000000042",
+      "stage": "ResponseComplete",
+      "level": "Metadata",
+      "requestUri": "/api/v1/namespaces/shop/serviceaccounts/checkout-sa/token",
+      "verb": "create",
+      "user": {
+       "username": "system:node:node-1",
+       "groups": [
+        "system:nodes",
+        "system:authenticated"
+       ]
+      },
+      "sourceIps": [
+       "10.0.0.11"
+      ],
+      "userAgent": "kubelet/UNPINNED",
+      "objectRef": {
+       "resource": "serviceaccounts",
+       "subresource": "token",
+       "namespace": "shop",
+       "name": "checkout-sa",
+       "apiVersion": "v1"
+      },
+      "responseCode": 201,
+      "annotations": {
+       "authentication.kubernetes.io/issued-credential-id": "JTI=4f0c2a7e-5d6b-4e8f-9a1b-000000000007"
+      },
+      "requestReceivedTimestamp": "2026-09-26T09:39:59.100Z",
+      "stageTimestamp": "2026-09-26T09:39:59.130Z",
+      "policyVersion": "audit-policy.v0",
+      "position": {
+       "route": "LOG_FILE_TAIL",
+       "fileDev": "2051",
+       "fileIno": "5521",
+       "fileOffset": "88213"
+      }
+     },
+     "normalizerVersion": "norm-0",
+     "contextVersion": "ctx-hist:UNFROZEN-EXAMPLE",
+     "actionId": "9c1f0e2d-3b4a-4c5d-9e6f-000000000042",
+     "auditDerived": {
+      "issuedCredentialId": "4f0c2a7e-5d6b-4e8f-9a1b-000000000007",
+      "observedSource": "10.0.0.11",
+      "principal": {
+       "type": "NODE",
+       "name": "node-1",
+       "strengthClass": "STRENGTH_CONTEXT"
+      }
+     }
+    },
+    "logicalId": "ev_b773be158975d3d6a67117f915bdc2e9"
+   }
+  },
+  {
+   "label": "N6 normalized gateway observation",
+   "topic": "agent.A.v0",
+   "key_hex": "4d540000030103000000067265712d3137",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "normalizer",
+    "producerVersion": "0.0.0-design",
+    "kind": "NORMALIZED_EVENT",
+    "source": "GATEWAY",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "normalizedEvent": {
+     "eventId": "ev_95b58086ce1bed1a2dded5283913838c",
+     "source": "GATEWAY",
+     "sourceNativeId": "req-17",
+     "sourceStage": "request",
+     "time": {
+      "sourceTime": "2026-09-26T09:59:40Z",
+      "eventTime": "2026-09-26T09:59:40Z",
+      "ingestTime": "2026-09-26T09:59:40.200Z",
+      "eventTimeBasis": "GATEWAY_OBSERVATION"
+     },
+     "entities": [
+      {
+       "type": "HTTP_REQUEST",
+       "uid": "req-17",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "gateway": {
+      "requestId": "req-17",
+      "route": "/checkout",
+      "method": "POST",
+      "authority": "shop.example",
+      "path": "/checkout",
+      "peerIp": "198.51.100.23",
+      "responseStatus": 400,
+      "responseBodyBytes": "512",
+      "matches": [
+       {
+        "patternId": "sqli-union",
+        "patternSetVersion": "P_A:UNFROZEN-EXAMPLE",
+        "location": "REQUEST_BODY",
+        "chunkIndex": 0
+       }
+      ],
+      "bodyTruncated": false,
+      "observerLoss": false,
+      "gatewayBuild": "UNPINNED"
+     },
+     "normalizerVersion": "norm-0",
+     "contextVersion": "ctx-hist:UNFROZEN-EXAMPLE",
+     "actionId": "req-17"
+    },
+    "logicalId": "ev_95b58086ce1bed1a2dded5283913838c"
+   }
+  },
+  {
+   "label": "F1 D1 token-read-anomaly (mapped)",
+   "topic": "findings.v0",
+   "key_hex": "4d5400000f01100000002366645f6532323937633030623633303866343962383065393138313739363764316431",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "agents",
+    "producerVersion": "0.0.0-design",
+    "kind": "FINDING",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "finding": {
+     "findingId": "fd_e2297c00b6308f49b80e91817967d1d1",
+     "findingType": "D1",
+     "findingName": "token-read-anomaly",
+     "agentId": "D",
+     "actionId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/71",
+     "eventStart": "2026-09-26T10:00:01Z",
+     "eventEnd": "2026-09-26T10:00:01Z",
+     "publishTime": "2026-09-26T10:00:01.900Z",
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "PROCESS_LINEAGE",
+       "uid": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "inputEventIds": [
+      "ev_f65cfcaac6dfc640bd00e0e85fa5efb0"
+     ],
+     "detectorVersion": "D-0",
+     "artifactVersions": [
+      "E_D1:UNFROZEN-EXAMPLE"
+     ],
+     "attributes": {
+      "token_owner_pod_uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "token_version_dir": "..2026_09_26_09_40_00.3141592653",
+      "reader_class": "READER_POD_PROCESS",
+      "reader_pod_uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007"
+     },
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "severity": "MEDIUM",
+     "primaryTactic": "CREDENTIAL_ACCESS"
+    },
+    "logicalId": "fd_e2297c00b6308f49b80e91817967d1d1"
+   }
+  },
+  {
+   "label": "F2 E1 unsigned-image-admitted (unmapped)",
+   "topic": "findings.v0",
+   "key_hex": "4d5400000f01100000002366645f6535633064383534353466323836613663653366313033316439646439376163",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "agents",
+    "producerVersion": "0.0.0-design",
+    "kind": "FINDING",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "finding": {
+     "findingId": "fd_e5c0d85454f286a6ce3f1031d9dd97ac",
+     "findingType": "E1",
+     "findingName": "unsigned-image-admitted",
+     "agentId": "E",
+     "actionId": "a1d7c3e9-2b4f-4c6d-8e0a-000000000091",
+     "eventStart": "2026-09-26T09:39:58Z",
+     "eventEnd": "2026-09-26T09:39:58Z",
+     "publishTime": "2026-09-26T09:39:58.900Z",
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "IMAGE",
+       "uid": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d",
+       "strengthClass": "STRENGTH_MEDIUM"
+      }
+     ],
+     "inputEventIds": [
+      "ev_2e00bb3ab0ba14c02178f4cf42f73ce0"
+     ],
+     "detectorVersion": "E-0",
+     "artifactVersions": [],
+     "attributes": {
+      "policy": "require-signed-images",
+      "rule": "verify-signature",
+      "image_digest": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d",
+      "pod_uid_join_status": "conditional"
+     },
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "severity": "MEDIUM",
+     "completeness": {
+      "gaps": [
+       {
+        "reason": "CONDITIONAL_JOIN_UNVALIDATED",
+        "scope": "join=admission-pod-uid",
+        "detail": "admission-instance witness unavailable until KYV-POD-UID-DRYRUN passes"
+       }
+      ]
+     }
+    },
+    "logicalId": "fd_e5c0d85454f286a6ce3f1031d9dd97ac"
+   }
+  },
+  {
+   "label": "F3 E2 post-start-binary-write (unmapped)",
+   "topic": "findings.v0",
+   "key_hex": "4d5400000f01100000002366645f6665356637396462376461326137343934663665366133636663663934373531",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "agents",
+    "producerVersion": "0.0.0-design",
+    "kind": "FINDING",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "finding": {
+     "findingId": "fd_fe5f79db7da2a7494f6e6a3cfcf94751",
+     "findingType": "E2",
+     "findingName": "post-start-binary-write",
+     "agentId": "E",
+     "actionId": "node-1/5f2a9c1e-0000-4000-8000-00000000b001/72",
+     "eventStart": "2026-09-26T10:00:11Z",
+     "eventEnd": "2026-09-26T10:00:11Z",
+     "publishTime": "2026-09-26T10:00:11.900Z",
+     "entities": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      },
+      {
+       "type": "PROCESS_LINEAGE",
+       "uid": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "inputEventIds": [
+      "ev_1e0576634f85be938f984ca35c3e4c1c"
+     ],
+     "detectorVersion": "E-0",
+     "artifactVersions": [
+      "E_E2:UNFROZEN-EXAMPLE"
+     ],
+     "attributes": {
+      "file_identity": "dev=2050,ino=88113",
+      "mutation_op": "CHMOD",
+      "writer_process": "tgid=4217,start=912399000000"
+     },
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "severity": "MEDIUM"
+    },
+    "logicalId": "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+   }
+  },
+  {
+   "label": "W1 process-ancestry (direct, confirmed)",
+   "topic": "witness.decisions.v0",
+   "key_hex": "4d5400001001110000002377745f3434663833333435303133356632653762316436313364313665306236656234",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "orchestrator",
+    "producerVersion": "0.0.0-design",
+    "kind": "WITNESS",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "witness": {
+     "witnessId": "wt_44f833450135f2e7b1d613d16e0b6eb4",
+     "sourceFindingId": "fd_e2297c00b6308f49b80e91817967d1d1",
+     "targetFindingId": "fd_fe5f79db7da2a7494f6e6a3cfcf94751",
+     "relationshipType": "PROCESS_ANCESTRY",
+     "strengthClass": "DIRECT",
+     "joinKeyType": "lineage_id",
+     "joinKey": "ln_b86b3062dd671f9aeb317f2b3ae4bb36",
+     "directionBasis": "EVIDENCE_ORDER",
+     "sourceEventTime": "2026-09-26T10:00:01Z",
+     "targetEventTime": "2026-09-26T10:00:11Z",
+     "appliedLimits": [
+      {
+       "parameter": "W_w[process-ancestry]",
+       "parameterSetVersion": "UNFROZEN-EXAMPLE"
+      },
+      {
+       "parameter": "T",
+       "parameterSetVersion": "UNFROZEN-EXAMPLE"
+      }
+     ],
+     "evidenceEventIds": [
+      "ev_f65cfcaac6dfc640bd00e0e85fa5efb0",
+      "ev_1e0576634f85be938f984ca35c3e4c1c"
+     ],
+     "status": "CONFIRMED",
+     "decisionVersion": "orch-0",
+     "keyOrigin": [
+      {
+       "component": "lineage_id",
+       "origin": "SENSOR",
+       "evidenceEventIds": [
+        "ev_f65cfcaac6dfc640bd00e0e85fa5efb0",
+        "ev_1e0576634f85be938f984ca35c3e4c1c"
+       ]
+      }
+     ],
+     "contradictionCoverage": [
+      {
+       "source": "EBPF"
+      }
+     ]
+    },
+    "logicalId": "wt_44f833450135f2e7b1d613d16e0b6eb4"
+   }
+  },
+  {
+   "label": "W2 image-class (enabling only)",
+   "topic": "witness.decisions.v0",
+   "key_hex": "4d5400001001110000002377745f6666646136373161353038333665666462386538663834333566343036333765",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "orchestrator",
+    "producerVersion": "0.0.0-design",
+    "kind": "WITNESS",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "witness": {
+     "witnessId": "wt_ffda671a50836efdb8e8f8435f40637e",
+     "sourceFindingId": "fd_e5c0d85454f286a6ce3f1031d9dd97ac",
+     "targetFindingId": "fd_fe5f79db7da2a7494f6e6a3cfcf94751",
+     "relationshipType": "IMAGE_CLASS",
+     "strengthClass": "ENABLING",
+     "joinKeyType": "image_digest",
+     "joinKey": "sha256:0d5e7c1a9b3f4e2d8c6a0b1e2f3d4c5b6a7980e1d2c3b4a5968778695a4b3c2d",
+     "directionBasis": "EVIDENCE_ORDER",
+     "sourceEventTime": "2026-09-26T09:39:58Z",
+     "targetEventTime": "2026-09-26T10:00:11Z",
+     "appliedLimits": [],
+     "evidenceEventIds": [
+      "ev_2e00bb3ab0ba14c02178f4cf42f73ce0",
+      "ev_145e51300b35b94406c21e7a66024811"
+     ],
+     "status": "ENABLING_ONLY",
+     "decisionVersion": "orch-0",
+     "keyOrigin": [
+      {
+       "component": "image_digest",
+       "origin": "SENSOR",
+       "evidenceEventIds": [
+        "ev_2e00bb3ab0ba14c02178f4cf42f73ce0",
+        "ev_145e51300b35b94406c21e7a66024811"
+       ]
+      }
+     ],
+     "contradictionCoverage": []
+    },
+    "logicalId": "wt_ffda671a50836efdb8e8f8435f40637e"
+   }
+  },
+  {
+   "label": "I1 incident version 1 (sealed)",
+   "topic": "incidents.v0",
+   "key_hex": "4d54000011011200000023696e5f6362323065613362363437336334363064666666653536336565373863323237",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "orchestrator",
+    "producerVersion": "0.0.0-design",
+    "kind": "INCIDENT",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "incident": {
+     "incidentId": "in_cb20ea3b6473c460dfffe563ee78c227",
+     "anchorFindingId": "fd_e2297c00b6308f49b80e91817967d1d1",
+     "anchorEntity": {
+      "type": "POD",
+      "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "namespace": "shop",
+      "name": "checkout-7d9f-abcde",
+      "strengthClass": "STRENGTH_HIGH"
+     },
+     "version": 1,
+     "findingIds": [
+      "fd_e2297c00b6308f49b80e91817967d1d1",
+      "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+     ],
+     "linkWitnessIds": [
+      "wt_44f833450135f2e7b1d613d16e0b6eb4"
+     ],
+     "rankedPaths": [
+      {
+       "pathId": "pt_29649819924b8d1c91f8f5db8fada78d",
+       "findingIds": [
+        "fd_e2297c00b6308f49b80e91817967d1d1",
+        "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+       ],
+       "witnessIds": [
+        "wt_44f833450135f2e7b1d613d16e0b6eb4"
+       ]
+      }
+     ],
+     "speculativePaths": [
+      {
+       "pathId": "pt_dbce8e90687dc72a8f1d7ae1c9d27931",
+       "findingIds": [
+        "fd_e5c0d85454f286a6ce3f1031d9dd97ac",
+        "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+       ],
+       "witnessIds": [
+        "wt_ffda671a50836efdb8e8f8435f40637e"
+       ]
+      }
+     ],
+     "eventStart": "2026-09-26T10:00:01Z",
+     "eventEnd": "2026-09-26T10:00:11Z",
+     "status": "INCIDENT_SEALED",
+     "watermarkTime": "2026-09-26T11:00:00Z",
+     "sourceCompleteness": {},
+     "sealedPredictionVersion": "snapshot-1",
+     "decisionVersion": "orch-0"
+    },
+    "logicalId": "in_cb20ea3b6473c460dfffe563ee78c227"
+   }
+  },
+  {
+   "label": "I2 incident version 2 (amended; sealed snapshot unchanged)",
+   "topic": "incidents.v0",
+   "key_hex": "4d54000011011200000023696e5f6362323065613362363437336334363064666666653536336565373863323237",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "orchestrator",
+    "producerVersion": "0.0.0-design",
+    "kind": "INCIDENT",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "incident": {
+     "incidentId": "in_cb20ea3b6473c460dfffe563ee78c227",
+     "anchorFindingId": "fd_e2297c00b6308f49b80e91817967d1d1",
+     "anchorEntity": {
+      "type": "POD",
+      "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+      "namespace": "shop",
+      "name": "checkout-7d9f-abcde",
+      "strengthClass": "STRENGTH_HIGH"
+     },
+     "version": 2,
+     "findingIds": [
+      "fd_e2297c00b6308f49b80e91817967d1d1",
+      "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+     ],
+     "linkWitnessIds": [
+      "wt_44f833450135f2e7b1d613d16e0b6eb4"
+     ],
+     "rankedPaths": [
+      {
+       "pathId": "pt_29649819924b8d1c91f8f5db8fada78d",
+       "findingIds": [
+        "fd_e2297c00b6308f49b80e91817967d1d1",
+        "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+       ],
+       "witnessIds": [
+        "wt_44f833450135f2e7b1d613d16e0b6eb4"
+       ]
+      }
+     ],
+     "speculativePaths": [
+      {
+       "pathId": "pt_dbce8e90687dc72a8f1d7ae1c9d27931",
+       "findingIds": [
+        "fd_e5c0d85454f286a6ce3f1031d9dd97ac",
+        "fd_fe5f79db7da2a7494f6e6a3cfcf94751"
+       ],
+       "witnessIds": [
+        "wt_ffda671a50836efdb8e8f8435f40637e"
+       ]
+      }
+     ],
+     "eventStart": "2026-09-26T10:00:01Z",
+     "eventEnd": "2026-09-26T10:00:11Z",
+     "status": "INCIDENT_AMENDED",
+     "watermarkTime": "2026-09-26T11:00:00Z",
+     "sourceCompleteness": {
+      "currentExcludedSources": [
+       "AUDIT"
+      ]
+     },
+     "sealedPredictionVersion": "snapshot-1",
+     "decisionVersion": "orch-0",
+     "amendments": [
+      {
+       "version": 2,
+       "amendedAt": "2026-09-26T11:20:00Z",
+       "reason": "audit source excluded by max-idle after seal; analyst view only"
+      }
+     ]
+    },
+    "logicalId": "in_cb20ea3b6473c460dfffe563ee78c227"
+   }
+  },
+  {
+   "label": "GT ground-truth action (harness, access-separated)",
+   "topic": "ground.truth.v0",
+   "key_hex": "4d5400001401160000000d6578616d706c652d72756e2d30",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "scenario-harness",
+    "producerVersion": "0.0.0-design",
+    "kind": "GROUND_TRUTH_ACTION",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "groundTruthAction": {
+     "runId": "example-run-0",
+     "actionSeq": "3",
+     "scenarioId": "chain-1",
+     "variantId": "stay-in-X",
+     "stepLabel": "read projected token from inside the workload",
+     "isAttack": true,
+     "expectedFindingTypes": [
+      "D1"
+     ],
+     "intendedTactic": "CREDENTIAL_ACCESS",
+     "actors": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "targets": [
+      {
+       "type": "POD",
+       "uid": "3c9e1d2a-7a61-4f0e-9d11-00000000a007",
+       "namespace": "shop",
+       "name": "checkout-7d9f-abcde",
+       "strengthClass": "STRENGTH_HIGH"
+      }
+     ],
+     "startedAt": "2026-09-26T10:00:00.800Z",
+     "endedAt": "2026-09-26T10:00:01.200Z",
+     "harnessVersion": "harness-0",
+     "harnessOutcome": "exit=0"
+    },
+    "logicalId": "gt_0a2eeb240ef588793b972d09a2a19113"
+   }
+  },
+  {
+   "label": "RV1 D1 evaluation that fired",
+   "topic": "rule.evaluations.v0",
+   "key_hex": "4d5400001501170000002372765f3532656138653837656539323134336263663363363838353562643034303532",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "agents",
+    "producerVersion": "0.0.0-design",
+    "kind": "RULE_EVALUATION",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "ruleEvaluation": {
+     "evaluationId": "rv_52ea8e87ee92143bcf3c68855bd04052",
+     "ruleId": "D1",
+     "stateKeyHex": "4d5400000a020c0000002433633965316432612d376136312d346630652d396431312d3030303030303030613030370d000000156b7562652d6170692d6163636573732d78376b3270",
+     "windowStart": "2026-09-26T10:00:01Z",
+     "windowEnd": "2026-09-26T10:00:01Z",
+     "outcome": "FIRED",
+     "inputEventIds": [
+      "ev_f65cfcaac6dfc640bd00e0e85fa5efb0"
+     ],
+     "features": {
+      "reader_in_E_D1": "false",
+      "token_version_dir": "..2026_09_26_09_40_00.3141592653"
+     },
+     "detectorVersion": "D-0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "findingId": "fd_e2297c00b6308f49b80e91817967d1d1"
+    },
+    "logicalId": "rv_52ea8e87ee92143bcf3c68855bd04052"
+   }
+  },
+  {
+   "label": "RV2 H4 evaluation that did not fire (negative example)",
+   "topic": "rule.evaluations.v0",
+   "key_hex": "4d5400001501170000002372765f3961653166633166396465303663336430373630643231383939386432343433",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "agents",
+    "producerVersion": "0.0.0-design",
+    "kind": "RULE_EVALUATION",
+    "source": "SOURCE_UNSPECIFIED",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "ruleEvaluation": {
+     "evaluationId": "rv_9ae1fc1f9de06c3d0760d218998d2443",
+     "ruleId": "H4",
+     "stateKeyHex": "4d5400000d020c0000002433633965316432612d376136312d346630652d396431312d3030303030303030613030370b000000236c6e5f6238366233303632646436373166396165623331376632623361653462623336",
+     "windowStart": "2026-09-26T10:00:01Z",
+     "windowEnd": "2026-09-26T10:00:11Z",
+     "outcome": "NOT_FIRED",
+     "inputEventIds": [
+      "ev_f65cfcaac6dfc640bd00e0e85fa5efb0",
+      "ev_1e0576634f85be938f984ca35c3e4c1c"
+     ],
+     "features": {
+      "sensitive_read_in_C_H4": "false",
+      "external_transfer": "false"
+     },
+     "detectorVersion": "H-0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE"
+    },
+    "logicalId": "rv_9ae1fc1f9de06c3d0760d218998d2443"
+   }
+  },
+  {
+   "label": "HB heartbeat to an explicit partition",
+   "topic": "raw.ebpf.v0",
+   "key_hex": "4d540000130115000000126e6f64652d73656e736f72406e6f64652d31",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "node-sensor",
+    "producerVersion": "0.0.0-design",
+    "kind": "HEARTBEAT",
+    "source": "EBPF",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "heartbeat": {
+     "producerId": "node-sensor",
+     "producerInstance": "node-sensor@node-1",
+     "topic": "raw.ebpf.v0",
+     "partition": 0,
+     "lowWatermark": "2026-09-26T10:00:10Z",
+     "emittedAt": "2026-09-26T10:00:12Z",
+     "producerSeq": "901"
+    }
+   },
+   "explicit_partition": 0
+  },
+  {
+   "label": "SC source completeness (audit idle interval)",
+   "topic": "source.completeness.v0",
+   "key_hex": "4d540000120213000000054155444954140000001461756469742d636f6c6c6563746f723d61632d31",
+   "envelope": {
+    "schemaMajor": 0,
+    "schemaMinor": 1,
+    "producerId": "audit-collector",
+    "producerVersion": "0.0.0-design",
+    "kind": "SOURCE_COMPLETENESS",
+    "source": "AUDIT",
+    "run": {
+     "runId": "example-run-0",
+     "split": "SYNTHETIC_EXAMPLE",
+     "captureProfile": "research-superset-v0",
+     "parameterSetVersion": "UNFROZEN-EXAMPLE",
+     "descriptorSetSha256": "NOT-COMPUTED-FOR-EXAMPLE"
+    },
+    "sourceCompleteness": {
+     "source": "AUDIT",
+     "scope": "audit-collector=ac-1",
+     "intervalStart": "2026-09-26T10:40:00Z",
+     "intervalEnd": "2026-09-26T11:10:00Z",
+     "status": "INCOMPLETE",
+     "gaps": [
+      {
+       "reason": "SOURCE_IDLE",
+       "scope": "partition=raw.audit.v0/*",
+       "detail": "max-idle exceeded; excluded from watermark"
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,78 @@
+// MicroTRACE Gap 1 schema v0: the Kafka value envelope for every topic.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "microtrace/v0/common.proto";
+import "microtrace/v0/ebpf.proto";
+import "microtrace/v0/audit.proto";
+import "microtrace/v0/gateway.proto";
+import "microtrace/v0/kyverno.proto";
+import "microtrace/v0/offnode.proto";
+import "microtrace/v0/context.proto";
+import "microtrace/v0/normalized.proto";
+import "microtrace/v0/finding.proto";
+import "microtrace/v0/witness.proto";
+import "microtrace/v0/incident.proto";
+import "microtrace/v0/stream.proto";
+import "microtrace/v0/dataset.proto";
+
+enum RecordKind {
+  RECORD_KIND_UNSPECIFIED = 0;
+  RAW_EBPF = 1;
+  RAW_AUDIT = 2;
+  RAW_GATEWAY = 3;
+  RAW_KYVERNO = 4;
+  CONTEXT_OBSERVATION = 5;
+  CONTEXT_WATCH_GAP = 6;
+  TOKEN_FILE_VERSION = 7;
+  NORMALIZED_EVENT = 8;
+  FINDING = 9;
+  WITNESS = 10;
+  INCIDENT = 11;
+  HEARTBEAT = 12;
+  SOURCE_COMPLETENESS = 13;
+  GRAPH_EDGE = 14;
+  GROUND_TRUTH_ACTION = 15;
+  RULE_EVALUATION = 16;
+  RAW_DB_AUDIT = 17;
+  RAW_PATH_FLOW = 18;
+}
+
+message Envelope {
+  // A consumer rejects a record whose schema_major it does not implement.
+  // Minor versions only add fields.
+  uint32 schema_major = 1;
+  uint32 schema_minor = 2;
+  string producer_id = 3;
+  string producer_version = 4;
+  RecordKind kind = 5;
+  // Stable logical identity (kafka-contract.md, "Logical IDs"); the same
+  // record replayed carries the same value.
+  string logical_id = 6;
+  Source source = 7;
+  // Known gaps that apply to the whole record.
+  Completeness completeness = 8;
+  // Run, split, capture profile, and descriptor set of this record.
+  RunContext run = 9;
+  oneof payload {
+    RawEbpfRecord raw_ebpf = 20;
+    AuditEvent raw_audit = 21;
+    GatewayObservation raw_gateway = 22;
+    AdmissionDecision raw_kyverno = 23;
+    ObjectObservation context_observation = 24;
+    WatchGap context_watch_gap = 25;
+    TokenFileVersion token_file_version = 26;
+    NormalizedEvent normalized_event = 27;
+    Finding finding = 28;
+    Witness witness = 29;
+    Incident incident = 30;
+    Heartbeat heartbeat = 31;
+    SourceCompleteness source_completeness = 32;
+    GraphEdge graph_edge = 33;
+    GroundTruthAction ground_truth_action = 34;
+    RuleEvaluation rule_evaluation = 35;
+    DbAuditRecord raw_db_audit = 36;
+    PathFlowRecord raw_path_flow = 37;
+  }
+}

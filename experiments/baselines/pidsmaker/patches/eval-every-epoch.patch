@@ -1,0 +1,14 @@
+diff --git a/pidsmaker/detection/training_methods/training_loop.py b/pidsmaker/detection/training_methods/training_loop.py
+--- a/pidsmaker/detection/training_methods/training_loop.py
++++ b/pidsmaker/detection/training_methods/training_loop.py
+@@ -269,8 +269,8 @@
+             model_path = os.path.join(gnn_models_dir, f"model_epoch_{epoch}")
+             save_model(model, model_path)
+ 
+-        # Test
+-        if (epoch + 1) % 2 == 0 or epoch == 0:
++        # Test. MicroTRACE: every epoch, so the epoch with the lowest validation loss can be any epoch.
++        if True:  # was: (epoch + 1) % 2 == 0 or epoch == 0
+             test_stats = inference_loop.main(
+                 cfg=cfg,
+                 model=model,

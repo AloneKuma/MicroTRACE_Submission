@@ -1,0 +1,495 @@
+# MicroTRACE scenario catalogue overlay for the pilot-cases add-on set
+# (docs/plans/exp2-conflict-origin-cases-plan.md, D-31).
+#
+# Status: draft
+#
+# These scenarios are added to catalogue.v0.yaml only for runs that name
+# this file (mtgen build --catalogue-overlay; run matrix catalogue_overlays).
+# The scenarios PILOT uses keep their content, and catalogue.v0.yaml its hash.
+# Runs that use these scenarios set the generator flag
+# gateway_internal_listener, so background service-to-service calls also go
+# through the gateway's internal listener (G3).
+#
+# D-4: entries are reviewed by someone other than their author.
+
+version: catalogue.pilot-cases.v0
+status: draft
+coverage_required: false
+author: "claude (exp2-conflict-origin-cases-plan step 2, 2026-10-24)"
+reviewer: "claude review agent (D-4, independent of the author session), 2026-10-24: approved with changes, applied"
+
+scenarios:
+  # ========== No-Origin: a copied request ID (plan 3.2) ==========
+
+  - id: origin_request_id_graft
+    kind: attack
+    title: "No-Origin: a compromised service copies an edge request's ID onto its own injection request"
+    source:
+      class: adapted
+      anchor:
+        dataset: Kube-IDS0
+        location: "section 4: DVWA-SQLI"
+    author: "claude (exp2-conflict-origin-cases-plan step 2, 2026-10-24)"
+    window_s: 60
+    adaptation_note: |
+      Two unrelated incidents with one request ID. Step 1: an external attacker
+      sends a Kube-IDS0 DVWA-SQLI request to a service through the edge
+      gateway, which mints request ID r1 (origin SENSOR). Step 2: a separately
+      compromised service sends its own SQL injection request to a third
+      service through the gateway's internal listener, with x-request-id set
+      to r1 (copied from logs or a header it saw). Envoy generates the
+      x-request-id of external requests and keeps one an internal request
+      already carries (Envoy HTTP connection manager docs, x-request-id), so
+      the internal request keeps r1 and its origin is WORKLOAD
+      (gateway.proto field 16). Under the paper's rule (D3_v6 tab:witnesses,
+      key origin) a workload-asserted key never confirms a link alone, so the
+      two A1 requests are a nonlink; No-Origin treats the key as sensor-set and
+      grafts the second incident onto the first. Unlike the lookalike, the
+      caller of the internal request is not the service that received r1; that
+      difference is the real-world signal of a copied ID, intended, not a
+      generator confound.
+    roles:
+      - name: external_attacker
+        kind: external_client
+        description: "HTTP client of the first incident"
+      - name: edge_service
+        kind: internal_pod
+        description: "Service the first injection request reaches through the edge listener"
+      - name: compromised_service
+        kind: internal_pod
+        description: "Service compromised separately; sends the second request"
+      - name: internal_target
+        kind: internal_pod
+        description: "Service the second injection request reaches through the internal listener"
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: external_attacker
+          target_service: edge_service
+          method: GET
+          path: "/api/search"
+          query_params: "id=1 UNION ALL SELECT NULL,NULL,NULL"
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "UNION SELECT pattern matches P_A SQLi patterns"
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched SQL injection request"
+      - step: 2
+        action: http_request
+        incident: other     # a separate compromise; only the copied ID is shared
+        float: graft
+        params:
+          source_pod: compromised_service
+          target_service: internal_target
+          listener: internal
+          copy_request_id_of: "@step1.action_seq"
+          method: GET
+          path: "/api/search"
+          query_params: "id=1' OR 1=1 -- "
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "OR 1=1 comparison matches P_A sqli_or_comparison; the listener does not change the request's content"
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched SQL injection request"
+    links:
+      - from: 1
+        to: 2
+        witness: REQUEST_IDENTITY
+        expected: ABSENT
+        gap_s: [3, 25]
+        reason: "workload-set request ID copied from another request"
+        shared_keys: [request_id]
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  - id: origin_request_id_propagate
+    kind: lookalike
+    title: "No-Origin lookalike: a service propagates the edge request's ID on a benign downstream call"
+    source:
+      class: benign
+      citation:
+        source: "Envoy HTTP connection manager documentation"
+        reference: "x-request-id: generated for external requests, kept on internal requests that carry one"
+    author: "claude (exp2-conflict-origin-cases-plan step 2, 2026-10-24)"
+    window_s: 60
+    adaptation_note: |
+      The benign form of the graft's request pair. A client calls a service
+      through the edge gateway (minted ID, SENSOR); while serving it, the
+      service calls another service through the internal listener, within
+      5 s (the gateway renderer's PROPAGATE_WINDOW_NS), and forwards the same
+      x-request-id (WORKLOAD), as tracing-aware services do. The internal
+      request uses the graft's path, so the path does not predict A1.
+      Neither request matches P_A, so the internal listener has ABSENT A1
+      opportunities on a request with a copied ID, as the graft's second step
+      has PRESENT ones (plan 3.2, findings nuisance).
+    roles:
+      - name: client
+        kind: external_client
+      - name: frontend_service
+        kind: internal_pod
+      - name: backend_service
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: client
+          target_service: frontend_service
+          method: GET
+          path: "/api/search"
+          query_params: "id=1"
+        outcome: success
+        expects:
+          - finding: A1
+            state: ABSENT
+            reason: "No P_A pattern in the request"
+          - finding: A2
+            state: ABSENT
+            reason: "No matched request, so no success indicator"
+      - step: 2
+        action: http_request
+        float: propagate
+        params:
+          source_pod: frontend_service
+          target_service: backend_service
+          listener: internal
+          copy_request_id_of: "@step1.action_seq"
+          method: GET
+          path: "/api/search"
+          query_params: "id=1"
+        outcome: success
+        expects:
+          - finding: A1
+            state: ABSENT
+            reason: "No P_A pattern in the propagated request"
+          - finding: A2
+            state: ABSENT
+            reason: "No matched request, so no success indicator"
+    links:
+      - from: 1
+        to: 2
+        witness: REQUEST_IDENTITY
+        expected: UNOBSERVABLE
+        gap_s: [0.05, 5]
+        reason: "propagated ID is workload-asserted: a real call, but no sensor witness"
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== No-Conflict: a client port reused before the accept (plan 3.1) ==========
+  # Runs that use these scenarios set the generator flag ebpf_accept (G1):
+  # every in-cluster connect to a Pod is accepted on the server.
+
+  - id: conflict_port_reuse
+    kind: attack
+    title: "No-Conflict: an implant reconnects three times from one fixed source port"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (exp2-conflict-origin-cases-plan step 4, 2026-10-25)"
+    window_s: 60
+    adaptation_note: |
+      The CADETS internal port scan (as g1a_cadets_port_scan, MITRE ATT&CK
+      T1046) by an implant that binds its probe socket to a fixed source port
+      before connecting, as nc -p or ncat --source-port do (a full connect, so
+      the server accepts; nmap -g does not apply to connect scans). It closes
+      each probe with an RST (SO_LINGER 0), so the tuple is not held in
+      TIME_WAIT and the next socket, with SO_REUSEADDR, binds the port at
+      once. The implant connects to a metrics port of another service, an
+      edge outside Q_G1a, three times; each socket is new (its own cookie)
+      and the server accepts each one. Every connect and
+      accept shares one connection tuple, so the flow key alone would join
+      any connect to any later accept: an accept is the connect's own only
+      when no other socket connected on the tuple in between (the
+      correlator's port-reuse contradiction). A reconnect follows the probe's
+      exchange and close (5-50 ms) and its own accept delay (netmodel
+      reconnect_delay), so it is never within the clock uncertainty of the
+      accept before it. No LID-DS 2021 scenario
+      has a port scan, so CADETS is the closest anchor.
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+        description: "Pod running the implant"
+      - name: target_pod
+        kind: internal_pod
+        description: "Pod of another service whose metrics port the implant probes"
+    steps:
+      - step: 1
+        action: connect_internal
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 2
+        action: accept_internal
+        after: {step: 1, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step1.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+      - step: 3
+        action: connect_internal
+        after: {step: 2, gap_s: reconnect_delay}
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a; same source port, new socket"}
+      - step: 4
+        action: accept_internal
+        after: {step: 3, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step3.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+      - step: 5
+        action: connect_internal
+        after: {step: 4, gap_s: reconnect_delay}
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a; same source port, new socket"}
+      - step: 6
+        action: accept_internal
+        after: {step: 5, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step5.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+    links:
+      - {from: 1, to: 2, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of this socket's connection"}
+      - {from: 3, to: 4, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of this socket's connection"}
+      - {from: 5, to: 6, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of this socket's connection"}
+      - from: 1
+        to: 4
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        contradicted_by: [3]
+        shared_keys: [flow_tuple]
+        reason: "port reuse: step 3's socket connected on the tuple before the accept"
+      - from: 3
+        to: 6
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        contradicted_by: [5]
+        shared_keys: [flow_tuple]
+        reason: "port reuse: step 5's socket connected on the tuple before the accept"
+      - from: 1
+        to: 6
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        contradicted_by: [3, 5]
+        shared_keys: [flow_tuple]
+        reason: "port reuse: the sockets of steps 3 and 5 connected on the tuple before the accept"
+      - {from: 1, to: 3, witness: PROCESS_ANCESTRY, expected: PRESENT, reason: "same-process continuity: the implant reconnects"}
+      - {from: 3, to: 5, witness: PROCESS_ANCESTRY, expected: PRESENT, reason: "same-process continuity: the implant reconnects"}
+      - {from: 1, to: 5, witness: PROCESS_ANCESTRY, expected: PRESENT, reason: "same-process continuity: the implant reconnects", ordering: false}
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:     # source port 53 (a firewall-evasion favourite; NET_BIND_SERVICE is a default container capability), to a Prometheus port
+          - {field: step.1.params.source_port, value: 53}
+          - {field: step.3.params.source_port, value: 53}
+          - {field: step.5.params.source_port, value: 53}
+          - {field: step.1.params.target_port, value: 9090}
+          - {field: step.3.params.target_port, value: 9090}
+          - {field: step.5.params.target_port, value: 9090}
+
+  - id: conflict_port_reuse_unobserved
+    kind: degraded
+    title: "No-Conflict degraded: the reusing connect is lost in an eBPF gap"
+    source:
+      class: external
+      citation:
+        source: coverage gap
+        reference: eBPF probe gap at the second connect
+    author: "claude (exp2-conflict-origin-cases-plan step 4, 2026-10-25)"
+    window_s: 60
+    adaptation_note: |
+      conflict_port_reuse with step 3 unobserved: the second socket's connect
+      is lost, so the correlator cannot see that the tuple was reused before
+      the second accept, and the cross pairs cannot be ruled out (truth:
+      contradicted_by). The whole chain lies within A + beta of the gap, so
+      no link of it is decidable (distinctness near a declared gap).
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: target_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_internal
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 2
+        action: accept_internal
+        after: {step: 1, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step1.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+      - step: 3
+        action: connect_internal
+        after: {step: 2, gap_s: reconnect_delay}
+        unobserved: [ebpf]
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: UNOBSERVABLE, reason: "The connect is lost in an eBPF gap"}
+      - step: 4
+        action: accept_internal
+        after: {step: 3, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step3.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a (the server's node has no gap)"}
+      - step: 5
+        action: connect_internal
+        after: {step: 4, gap_s: reconnect_delay}
+        params: {source_pod: compromised_pod, target_service_or_pod: target_pod, target_port: 9100, protocol: tcp, source_port: 40000}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 6
+        action: accept_internal
+        after: {step: 5, gap_s: accept_delay}
+        params: {server_pod: target_pod, source_pod: compromised_pod, accept_of: "@step5.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+    links:
+      - {from: 1, to: 2, witness: NETWORK_FLOW, expected: UNOBSERVABLE, reason: "within A + beta of the eBPF gap"}
+      - {from: 3, to: 4, witness: NETWORK_FLOW, expected: UNOBSERVABLE, reason: "the connect is lost in an eBPF gap"}
+      - {from: 5, to: 6, witness: NETWORK_FLOW, expected: UNOBSERVABLE, reason: "within A + beta of the eBPF gap"}
+      - {from: 1, to: 4, witness: NETWORK_FLOW, expected: UNOBSERVABLE, contradicted_by: [3], reason: "the reusing connect is lost: port reuse not visible"}
+      - {from: 3, to: 6, witness: NETWORK_FLOW, expected: UNOBSERVABLE, contradicted_by: [5], reason: "the connect is lost in an eBPF gap"}
+      - {from: 1, to: 6, witness: NETWORK_FLOW, expected: UNOBSERVABLE, contradicted_by: [3, 5], reason: "a reusing connect is lost: port reuse not visible"}
+      - {from: 1, to: 3, witness: PROCESS_ANCESTRY, expected: UNOBSERVABLE, reason: "the connect is lost in an eBPF gap"}
+      - {from: 3, to: 5, witness: PROCESS_ANCESTRY, expected: UNOBSERVABLE, reason: "the connect is lost in an eBPF gap"}
+      - {from: 1, to: 5, witness: PROCESS_ANCESTRY, expected: PRESENT, reason: "same-process continuity: the implant reconnects (truth marks it unobservable when the lost connect lies between)", ordering: false}
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  - id: conflict_slow_accept
+    kind: attack
+    title: "No-Conflict gap matching: three probes queue at one backlogged server"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (exp2-conflict-origin-cases-plan step 4, 2026-10-25)"
+    window_s: 60
+    adaptation_note: |
+      The CADETS internal port scan from three Pods to the metrics port of
+      one server whose accept queue is backed up: each accept comes late,
+      after the next client has connected. The three clients are separate
+      incidents (independent footholds, or probes no witness joins). Their
+      timing is constructed for gap matching (plan 3.1, D-4 review), not
+      observed: each PRESENT link spans what a conflict_port_reuse nonlink
+      spans (exchange E and accept delays d: E+3d, E+3d, 2E+5d), and each
+      nonlink, the accept of the previous client's connection right after a
+      connect (another tuple: no witness, a true negative), spans one accept
+      delay, as a port-reuse PRESENT link does. So the gap does not tell a
+      G1a -> G1c link from a nonlink across the two scenarios. The long gaps
+      come from the exchange and from the 10 % backlogged accept draws.
+    roles:
+      - name: client_a
+        kind: internal_pod
+        description: "First probing Pod"
+      - name: client_b
+        kind: internal_pod
+        description: "Second probing Pod"
+      - name: client_c
+        kind: internal_pod
+        description: "Third probing Pod"
+      - name: server
+        kind: internal_pod
+        description: "Backlogged server whose metrics port all three probe"
+    steps:
+      - step: 1
+        action: connect_internal
+        params: {source_pod: client_a, target_service_or_pod: server, target_port: 9100, protocol: tcp}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 2
+        action: connect_internal
+        incident: client_b
+        after: {step: 1, gap_s: "reconnect_delay+accept_delay"}
+        params: {source_pod: client_b, target_service_or_pod: server, target_port: 9100, protocol: tcp}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 3
+        action: accept_internal
+        after: {step: 2, gap_s: accept_delay}
+        params: {server_pod: server, source_pod: client_a, accept_of: "@step1.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+      - step: 4
+        action: connect_internal
+        incident: client_c
+        after: {step: 3, gap_s: reconnect_delay}
+        params: {source_pod: client_c, target_service_or_pod: server, target_port: 9100, protocol: tcp}
+        outcome: success
+        expects:
+          - {finding: G1a, state: PRESENT, reason: "Connection on an edge outside Q_G1a"}
+      - step: 5
+        action: accept_internal
+        incident: client_b
+        after: {step: 4, gap_s: accept_delay}
+        params: {server_pod: server, source_pod: client_b, accept_of: "@step2.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+      - step: 6
+        action: accept_internal
+        incident: client_c
+        after: {step: 5, gap_s: "reconnect_delay*2+accept_delay*2"}
+        params: {server_pod: server, source_pod: client_c, accept_of: "@step4.action_seq"}
+        outcome: success
+        expects:
+          - {finding: G1c, state: PRESENT, reason: "Accepted connection on an edge outside Q_G1a"}
+    links:
+      - {from: 1, to: 3, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of client A's connection, late in a backed-up queue"}
+      - {from: 2, to: 5, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of client B's connection, late in a backed-up queue"}
+      - {from: 4, to: 6, witness: NETWORK_FLOW, expected: PRESENT, reason: "the accept of client C's connection, late in a backed-up queue"}
+      - from: 2
+        to: 3
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        shared_keys: [time]
+        reason: "the accept of client A's connection, not client B's: another tuple"
+      - from: 4
+        to: 5
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        shared_keys: [time]
+        reason: "the accept of client B's connection, not client C's: another tuple"
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:     # a Prometheus port
+          - {field: step.1.params.target_port, value: 9090}
+          - {field: step.2.params.target_port, value: 9090}
+          - {field: step.4.params.target_port, value: 9090}

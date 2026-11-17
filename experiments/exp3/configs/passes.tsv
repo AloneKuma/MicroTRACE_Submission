@@ -1,0 +1,21 @@
+# Exp. 3 passes (mtcore.exp3.run): each runs on the same received (degraded) stream of every condition
+# it lists (shell patterns). PROPOSED (worklog section 4, P-8). Columns (tab-separated): name,
+# correlator (go|sage), params (@main = the set's frozen file), ablation (orchestrator.ablations switch,
+# derived from @main with nothing else changed, or -), findings_from (sage: the go pass), sage_variant,
+# conditions. Live conditions also get live_full (agents + GO on Kafka, @main) without a row here.
+# Ablation "drop:PATH_FLOW" is not a GO switch: No-OffNode drops the flow export S_F before agents
+# and GO (score_pilot.py --drop-source PATH_FLOW, declared not shipped; Q-4, decided 2026-11-16).
+# no_coverage and no_uncertainty are GO switches (Q-1, Q-2, decided 2026-11-16); No-History is a
+# generator identity variant built on branch exp3-nohistory (Q-3): see the note at the end.
+full	go	@main	-	-	-	*
+no_contra_coverage	go	@main	no_contra_coverage	-	-	nofault,loss-*,outage-*,suppress-*
+no_epoch	go	@main	no_epoch	-	-	nofault,compromise-*
+sage_ag	sage	@main	-	full	ag	nofault,loss-*,outage-*,skew-*,reorder-*,suppress-*,compromise-*
+sage_seq	sage	@main	-	full	seq	nofault,loss-*,outage-*,skew-*,reorder-*,suppress-*,compromise-*
+no_coverage	go	@main	no_coverage	-	-	nofault,loss-*,outage-*
+no_uncertainty	go	@main	no_uncertainty	-	-	nofault,skew-*
+no_offnode	go	@main	drop:PATH_FLOW	-	-	nofault,loss-*,outage-*
+# 2026-11-17 POST-HOC (after the held-out loss rows): Full with scoped loss records (mtcore.orchestrator.params
+# scoped_loss; the sender names the lost records' witness keys). Reported apart from the frozen rows.
+full_scoped	go	src/params/frozen/pilot-multistep-fit.K10.mlv2.scoped-loss.yaml	-	-	-	nofault,loss-*
+# No-History (Q-3): no row; the full pass on the nohistory* conditions (conditions.tsv) is the No-History result.

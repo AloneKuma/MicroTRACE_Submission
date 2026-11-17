@@ -1,0 +1,75 @@
+# PIDSMaker (KAIROS, ORTHRUS) on the shared test host.
+#
+# Used instead of PIDSMaker's own compose files, which reserve an NVIDIA GPU
+# (the host has none), publish ports 8000/5000/8888 and use fixed names
+# (postgres, postgres_data, shared_network) that could clash with other
+# projects. Same image (PIDSMaker's Dockerfile at tag 3.0.0), same initdb
+# script and mounts; unique names, a private network, no published ports, no
+# GPU, memory limits. On the private network the database answers to
+# "postgres" as well, so PIDSMaker's default --database_host works.
+#
+# Layout on the host (this file sits next to the clone):
+#   ~/microtrace-baselines/pidsmaker/{compose.mt.yml, PIDSMaker/, data/, artifacts/}
+#
+#   docker compose -f compose.mt.yml build app
+#   docker compose -f compose.mt.yml up -d
+#   docker compose -f compose.mt.yml exec app bash
+#   docker compose -f compose.mt.yml down          # keeps the volume and image
+name: mtpids
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: mtpids-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command: ["postgres", "-c", "shared_buffers=512MB", "-c", "work_mem=64MB",
+              "-c", "maintenance_work_mem=512MB", "-c", "max_wal_size=4GB"]
+    networks:
+      mtpids_net:
+        aliases: [postgres]
+    volumes:
+      - mtpids_pgdata:/var/lib/postgresql/data
+      - ./PIDSMaker/postgres/init-create-empty-databases.sh:/docker-entrypoint-initdb.d/init-create-empty-databases.sh:ro
+      - ./PIDSMaker/scripts:/scripts:ro
+      - ./data:/data:ro
+    mem_limit: 2g
+    memswap_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ./PIDSMaker
+    image: mtpids-app:3.0.0
+    container_name: mtpids-app
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PYTHONHASHSEED: "0"
+      CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+    networks:
+      - mtpids_net
+    volumes:
+      - ./PIDSMaker:/home/pids
+      - ./artifacts:/home/artifacts
+    mem_limit: 11g
+    memswap_limit: 11g
+    stdin_open: true
+    tty: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  mtpids_net:
+    name: mtpids_net
+
+volumes:
+  mtpids_pgdata:
+    name: mtpids_pgdata

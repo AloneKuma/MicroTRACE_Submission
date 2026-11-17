@@ -1,0 +1,314 @@
+// MicroTRACE Gap 1 schema v0: node-sensor records (raw.ebpf.v0).
+// Families and their consumers are declared in spec/node/capture-manifest.v0.yaml.
+// Probe attachment points are proposals pending Gap 2 tests.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "microtrace/v0/common.proto";
+
+// Process instance identity. tgid alone is reused; start time since boot
+// and boot_id make the key unique on a node.
+message ProcessKey {
+  string node_id = 1;
+  string boot_id = 2;
+  uint32 tgid = 3;
+  uint64 start_time_ns = 4;
+}
+
+// Resolved runtime container. pod_uid is absent for host processes and
+// until normalization resolves it from cgroup/container identity.
+message ContainerRef {
+  string container_id = 1;
+  uint64 cgroup_id = 2;
+  optional string pod_uid = 3;
+  string container_name = 4;
+}
+
+enum ReaderClass {
+  READER_CLASS_UNSPECIFIED = 0;
+  // Process inside a Pod container cgroup.
+  READER_POD_PROCESS = 1;
+  // Process with no owning Pod (host mount namespace or node cgroup).
+  READER_HOST_PROCESS = 2;
+  READER_UNATTRIBUTED = 3;
+}
+
+enum OpResult {
+  OP_RESULT_UNSPECIFIED = 0;
+  SUCCESS = 1;
+  FAILURE = 2;
+  RESULT_UNKNOWN = 3;
+}
+
+// Kubelet atomic-writer version directory holding a projected file, e.g.
+// "..2026_09_26_10_00_00.1234567". The "..data" symlink points at it.
+message ProjectedVersion {
+  string owner_pod_uid = 1;
+  string volume_name = 2;
+  string version_dir = 3;
+  string file_name = 4;
+}
+
+message FileIdentity {
+  uint64 dev = 1;
+  uint64 ino = 2;
+  // Mount namespace (nsfs inode) of the process performing the operation.
+  uint64 mnt_ns_inum = 3;
+  int32 mnt_id = 4;
+  // Path resolved from the opened file, relative to its mount namespace root.
+  string resolved_path = 5;
+  // Path argument as supplied by the process (may be a symlink route).
+  string path_as_opened = 6;
+  // Present only when (dev, ino) matched the node's projected-file index.
+  optional ProjectedVersion projected = 7;
+}
+
+message ExecDetail {
+  string filename = 1;
+  FileIdentity executable = 2;
+  // SHA-256 over the NUL-joined argv; argv text itself is not exported
+  // because it may contain secrets.
+  string argv_sha256 = 3;
+  string argv0 = 4;
+  // True when the new process is the first process in its container
+  // lineage (its parent is outside the container cgroup, e.g. a runtime shim).
+  bool starts_new_lineage = 5;
+  // research-superset profile only: redacted argv text in the protected
+  // archive. Environment variables are never captured.
+  optional EvidenceRef argv_protected = 6;
+}
+
+enum FileAccessOp {
+  FILE_ACCESS_OP_UNSPECIFIED = 0;
+  FILE_OPEN = 1;
+  FILE_READ = 2;
+}
+
+message FileAccessDetail {
+  FileAccessOp op = 1;
+  FileIdentity file = 2;
+  uint32 open_flags = 3;
+  uint32 fd = 4;
+  // Bytes returned by a successful read; 0 for OPEN.
+  uint64 bytes = 5;
+}
+
+enum FileMutationOp {
+  FILE_MUTATION_OP_UNSPECIFIED = 0;
+  WRITE = 1;
+  CREATE = 2;
+  CHMOD = 3;
+  RENAME = 4;
+  UNLINK = 5;
+  // Shared writable mapping; content writes after mapping are not observed.
+  MMAP_SHARED_WRITE = 6;
+}
+
+message FileMutationDetail {
+  FileMutationOp op = 1;
+  FileIdentity file = 2;
+  optional FileIdentity rename_target = 3;
+  optional uint32 new_mode = 4;
+  // Absent unless the sensor observed the prior inode mode.
+  optional uint32 prior_mode = 5;
+  bool executable_after = 6;
+  uint64 bytes = 7;
+}
+
+message Creds {
+  uint32 uid = 1;
+  uint32 euid = 2;
+  uint32 gid = 3;
+  uint32 egid = 4;
+  uint64 cap_effective = 5;
+  uint64 cap_permitted = 6;
+}
+
+enum PrivilegeOp {
+  PRIVILEGE_OP_UNSPECIFIED = 0;
+  COMMIT_CREDS = 1;
+  SETUID_FAMILY = 2;
+  CAPSET = 3;
+}
+
+message PrivilegeDetail {
+  PrivilegeOp op = 1;
+  Creds before = 2;
+  Creds after = 3;
+  // Executable that caused the transition (setuid binary), if any.
+  optional FileIdentity via_executable = 4;
+}
+
+// nsfs inode numbers of the process namespaces.
+message NamespaceSet {
+  uint64 mnt = 1;
+  uint64 pid = 2;
+  uint64 net = 3;
+  uint64 uts = 4;
+  uint64 ipc = 5;
+  uint64 cgroup = 6;
+  uint64 user = 7;
+}
+
+enum NamespaceOp {
+  NAMESPACE_OP_UNSPECIFIED = 0;
+  SETNS = 1;
+  UNSHARE = 2;
+  MOUNT = 3;
+  // Namespace sample taken at exec or on a periodic census.
+  NS_SAMPLE = 4;
+}
+
+message NamespaceDetail {
+  NamespaceOp op = 1;
+  uint64 clone_flags = 2;
+  NamespaceSet before = 3;
+  NamespaceSet after = 4;
+  // Namespaces of the node's init process, recorded by the sensor at start.
+  NamespaceSet host_reference = 5;
+  string mount_source = 6;
+  string mount_target = 7;
+}
+
+message PtraceDetail {
+  int64 request = 1;
+  ProcessKey target = 2;
+}
+
+message BpfDetail {
+  int32 cmd = 1;
+  // True when the caller is the declared MicroTRACE sensor identity.
+  bool caller_is_sensor = 2;
+}
+
+message Endpoint {
+  string ip = 1;
+  uint32 port = 2;
+  // IPPROTO_* number.
+  uint32 protocol = 3;
+  // Unix socket path, when the socket is AF_UNIX.
+  string unix_path = 4;
+}
+
+// Kernel socket cookie plus node and boot identity.
+message FlowId {
+  string node_id = 1;
+  string boot_id = 2;
+  uint64 socket_cookie = 3;
+}
+
+enum SocketOp {
+  SOCKET_OP_UNSPECIFIED = 0;
+  CONNECT = 1;
+  ACCEPT = 2;
+}
+
+message SocketDetail {
+  SocketOp op = 1;
+  Endpoint local = 2;
+  Endpoint remote = 3;
+  FlowId flow = 4;
+}
+
+// Per-flow byte counter for one interval. Allowed for H1 volume baselines
+// and as H4 transfer evidence only when owned by one process lineage.
+message FlowCounter {
+  FlowId flow = 1;
+  Endpoint remote = 2;
+  uint64 bytes_out = 3;
+  uint64 bytes_in = 4;
+  uint64 interval_start_mono_ns = 5;
+  uint64 interval_end_mono_ns = 6;
+}
+
+// Sensor loss accounting per event family and interval.
+message LossCounter {
+  string event_family = 1;
+  string queue = 2;
+  uint64 attempted = 3;
+  uint64 emitted = 4;
+  uint64 dropped = 5;
+  uint32 queue_occupancy_max = 6;
+  uint64 interval_start_mono_ns = 7;
+  uint64 interval_end_mono_ns = 8;
+}
+
+// Paired clock sample for the monotonic-to-wall model.
+message ClockSample {
+  uint64 monotonic_ns = 1;
+  int64 realtime_unix_ns = 2;
+  string sync_source = 3;
+  uint64 reported_error_bound_ns = 4;
+}
+
+// Census entry of family token.file_index: one projected file version found
+// under the kubelet Pod volume directory. No token bytes are read.
+message ProjectedIndexEntry {
+  ProjectedVersion version = 1;
+  uint64 dev = 2;
+  uint64 ino = 3;
+  // True when the "..data" symlink currently targets this version directory.
+  bool current = 4;
+}
+
+// research-superset profile only: one syscall exit of a Pod-attributed
+// process. Pointer arguments are not dereferenced or exported.
+message SyscallRecord {
+  int32 nr = 1;
+  string name = 2;
+  int64 ret = 3;
+  uint64 duration_ns = 4;
+}
+
+message RawEbpfRecord {
+  string node_id = 1;
+  string boot_id = 2;
+  // Strictly increasing per (node_id, boot_id); the ordering authority for
+  // events from one node.
+  uint64 node_seq = 3;
+  uint64 monotonic_ns = 4;
+  string capture_manifest_version = 5;
+  // Family ID from the capture manifest, e.g. "file.read".
+  string event_family = 6;
+  ProcessKey process = 7;
+  ProcessKey parent = 8;
+  // First ancestor whose parent is outside the container cgroup; for a host
+  // process, the first ancestor below the node init process.
+  ProcessKey lineage_root = 9;
+  ContainerRef container = 10;
+  ReaderClass reader_class = 11;
+  OpResult result = 12;
+  // Syscall return value or negative errno.
+  int64 return_value = 13;
+  oneof detail {
+    ExecDetail exec = 20;
+    FileAccessDetail file_access = 21;
+    FileMutationDetail file_mutation = 22;
+    PrivilegeDetail privilege = 23;
+    NamespaceDetail namespace_change = 24;
+    PtraceDetail ptrace = 25;
+    BpfDetail bpf = 26;
+    SocketDetail socket = 27;
+    FlowCounter flow_counter = 28;
+    LossCounter loss = 29;
+    ClockSample clock = 30;
+    ProjectedIndexEntry projected_index = 31;
+    SyscallRecord syscall = 32;
+  }
+}
+
+// Conditional node-agent index (family token.jti_index): maps a projected
+// token file version to its JTI and expiry. The agent parses the claims and
+// discards token bytes. Not published until CRED-JTI-VERSION-INDEX passes.
+message TokenFileVersion {
+  string node_id = 1;
+  string owner_pod_uid = 2;
+  string volume_name = 3;
+  string version_dir = 4;
+  uint64 dev = 5;
+  uint64 ino = 6;
+  string jti = 7;
+  int64 expiry_unix_s = 8;
+  uint64 observed_mono_ns = 9;
+}

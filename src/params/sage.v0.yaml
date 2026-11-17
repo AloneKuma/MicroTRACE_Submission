@@ -1,0 +1,21 @@
+# SAGE baseline parameters (mtcore.baselines.sage.run).
+#
+# Status: FITTED (values under fit:). t and w are SAGE's published defaults until
+# src/scripts/pilot/fit_sage.py fits them on the PILOT FIT half (grid in
+# docs/plans/sage-baseline.md) and writes the frozen values here. k is the
+# GO's frozen K (10; docs/design/parameter-register.md): ranked paths kept per
+# incident, so path metrics compare like with like.
+version: sage.v0
+fitted: true
+mapping: spec/baselines/sage-mapping.v2.yaml
+mapping_sha256: bdc36d785e25506a53cc611b08d5070010bf3d87ef78941822011c9c4e949213
+t: 0.5
+w: 15
+k: 10
+fit:
+  split: pilot-multistep-split.json
+  fit_runs: 170
+  variant: ag
+  grid_t: 0.5,1,2,5
+  grid_w: 15,30,45,60,90,150
+  fit_link_f1: 0.0303

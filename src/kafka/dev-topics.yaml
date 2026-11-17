@@ -1,0 +1,22 @@
+# Development topic settings for the single-node Kafka on the test host.
+# Topic names come from spec/kafka/topics.yaml; this file only sets the
+# numbers the spec leaves to deployment. Not the values of an evaluated run:
+# those are frozen per topic generation and recorded with the run.
+defaults:
+  partitions: 3
+  replication_factor: 1
+  retention_ms: 604800000   # 7 days
+  timestamp_type: CreateTime
+
+# Topics written by the ingest receiver use broker receipt time
+# (spec/kafka/ship-contract.md, "Roles").
+overrides:
+  raw.ebpf.v0: {timestamp_type: LogAppendTime}
+  raw.audit.v0: {timestamp_type: LogAppendTime}
+  raw.gateway.v0: {timestamp_type: LogAppendTime}
+  raw.kyverno.v0: {timestamp_type: LogAppendTime}
+  raw.dbaudit.v0: {timestamp_type: LogAppendTime}
+  raw.pathflow.v0: {timestamp_type: LogAppendTime}
+  context.cluster.v0: {timestamp_type: LogAppendTime}
+  norm.events.v0: {timestamp_type: LogAppendTime}
+  source.completeness.v0: {timestamp_type: LogAppendTime}

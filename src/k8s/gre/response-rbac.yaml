@@ -1,0 +1,186 @@
+# GRE identities and RBAC (design-spec section 4).
+#
+# gre-executor holds one standing privilege: create a token for one of the
+# four response ServiceAccounts (resourceNames). Each response account holds
+# get and list on its target kind (for revalidation, including the exact
+# read of the reviewed version) and the one write its action needs, only in
+# the application namespace shop (nodes are cluster-scoped). No account has
+# a bound token, and none may touch admission policies.
+#
+# gre-verify (7.4) checks postconditions: it runs probe Pods in
+# microtrace-probe (restricted Pod Security level; the gre-verify admission
+# policy allows only the pinned probe images), reads Pods in shop, reads
+# roles, and asks SubjectAccessReviews. It writes nothing outside
+# microtrace-probe.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: microtrace
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-executor, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-isolate, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-cordon, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-scale, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-revoke, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: gre-verify, namespace: microtrace}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: microtrace-probe
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+---
+# executor: mint tokens for the response accounts only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-executor-mint, namespace: microtrace}
+rules:
+  - apiGroups: [""]
+    resources: ["serviceaccounts/token"]
+    resourceNames: ["gre-isolate", "gre-cordon", "gre-scale", "gre-revoke", "gre-verify"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-executor-mint, namespace: microtrace}
+subjects: [{kind: ServiceAccount, name: gre-executor, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-executor-mint}
+---
+# isolate: label one Pod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-isolate, namespace: shop}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-isolate, namespace: shop}
+subjects: [{kind: ServiceAccount, name: gre-isolate, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-isolate}
+---
+# cordon: one Node (cluster-scoped)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: gre-cordon}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: gre-cordon}
+subjects: [{kind: ServiceAccount, name: gre-cordon, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: gre-cordon}
+---
+# scale: the scale subresource of one Deployment or StatefulSet
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-scale, namespace: shop}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale", "statefulsets/scale"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-scale, namespace: shop}
+subjects: [{kind: ServiceAccount, name: gre-scale, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-scale}
+---
+# revoke: delete one RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-revoke, namespace: shop}
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-revoke, namespace: shop}
+subjects: [{kind: ServiceAccount, name: gre-revoke, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-revoke}
+---
+# verify: probe Pods in microtrace-probe only
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-verify-probes, namespace: microtrace-probe}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-verify-probes, namespace: microtrace-probe}
+subjects: [{kind: ServiceAccount, name: gre-verify, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-verify-probes}
+---
+# verify: read the targets (the isolated Pod's IP, the scaled workload's Pods)
+# and the roles a revoked binding referred to
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: gre-verify-read, namespace: shop}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: gre-verify-read, namespace: shop}
+subjects: [{kind: ServiceAccount, name: gre-verify, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: gre-verify-read}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: gre-verify}
+rules:
+  - apiGroups: ["authorization.k8s.io"]
+    resources: ["subjectaccessreviews"]
+    verbs: ["create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: gre-verify}
+subjects: [{kind: ServiceAccount, name: gre-verify, namespace: microtrace}]
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: gre-verify}

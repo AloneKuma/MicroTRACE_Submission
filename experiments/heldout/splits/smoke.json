@@ -1,0 +1,10 @@
+{
+ "smoke": [
+  "00c9398a-6961-5520-b006-e5893f3fa266",
+  "03fd6fd3-11b1-5857-8212-bb8ed2a1a073",
+  "05182fdb-5915-546c-a694-f4c9960e8906",
+  "053d622c-0f33-5dd4-b0c0-c24294b878eb",
+  "0593597a-4760-5a8c-b9e8-284601e45d1b"
+ ],
+ "_source": "smoke test: first 5 PILOT SCORE runs (development data, not held-out)"
+}

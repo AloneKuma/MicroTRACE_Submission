@@ -1,0 +1,12 @@
+# PROPOSED (worklog section 4, P-3): the largest worker node's clock runs 10s ahead (source
+# stage); declared: its records' clock_uncertainty_ns is raised to cover the shift.
+version: faultplan.v0
+seed: 3200
+target: largest-worker
+faults:
+  - id: skew-10s-undeclared
+    kind: skew
+    stage: source
+    nodes: target
+    offset: 10s
+    declare_uncertainty: false

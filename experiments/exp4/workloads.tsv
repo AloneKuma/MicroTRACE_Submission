@@ -1,0 +1,7 @@
+# Exp. 4 finding-rate workloads: a unit is OVERLAY runs of the set replayed into one GO (runs sorted by
+# run ID, consecutive groups; 328 HELD_OUT runs divide by 1, 2, 4 and 8). PROPOSED levels.
+workload	overlay	note
+m1	1	natural rate: one run per GO (the Exp. 1-2 unit)
+m2	2	2x finding and event rate
+m4	4	4x
+m8	8	8x

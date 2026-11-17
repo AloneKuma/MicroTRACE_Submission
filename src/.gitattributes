@@ -1,0 +1,2 @@
+# Scripts and sources run on Linux hosts: keep LF in every checkout.
+* text=auto eol=lf

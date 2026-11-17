@@ -1,0 +1,78 @@
+# PIDSMaker (KAIROS, ORTHRUS) on an AWS machine, CPU by default; compose.gpu.yml adds the GPU
+# (development: g6 GPU machines; held-out: the m7i.8xlarge analysis host, 128 GB, no GPU).
+#
+# Same as compose.mt.yml except: memory limits fit the bigger machine, and Python
+# output is unbuffered so a killed run still leaves its log.
+#
+#   docker compose -f compose.aws.yml build app
+#   docker compose -f compose.aws.yml up -d                       # CPU
+#   docker compose -f compose.aws.yml -f compose.gpu.yml up -d    # with the GPU
+name: mtpids
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: mtpids-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    command: ["postgres", "-c", "shared_buffers=8GB", "-c", "work_mem=256MB",
+              "-c", "maintenance_work_mem=2GB", "-c", "max_wal_size=8GB"]
+    shm_size: 2g
+    networks:
+      mtpids_net:
+        aliases: [postgres]
+    volumes:
+      - mtpids_pgdata:/var/lib/postgresql/data
+      - ./PIDSMaker/postgres/init-create-empty-databases.sh:/docker-entrypoint-initdb.d/init-create-empty-databases.sh:ro
+      - ./PIDSMaker/scripts:/scripts:ro
+      - ./data:/data:ro
+    mem_limit: 16g
+    memswap_limit: 16g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ./PIDSMaker
+    image: mtpids-app:3.0.0
+    container_name: mtpids-app
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      PYTHONHASHSEED: "0"
+      PYTHONUNBUFFERED: "1"
+      CUBLAS_WORKSPACE_CONFIG: ":4096:8"
+    networks:
+      - mtpids_net
+    volumes:
+      - ./PIDSMaker:/home/pids
+      - ./artifacts:/home/artifacts
+    # KAIROS (tuned THEIA_E3, emb_dim 256) keeps the TGN neighbour graphs of
+    # all batches in RAM: about 200-250 GB (172 GB was not enough on the
+    # g5.8xlarge); it peaked at 193 GB on 2026-10-26. ORTHRUS peaked at 71 GB.
+    # APP_MEM fits the machine: 335g on the g6.24xlarge (363 GiB), 222g on the
+    # g6.16xlarge (~247 GiB), leaving postgres (16 GB) and the OS the rest.
+    # No swap: training reads every batch each epoch, so swapped batches only
+    # thrash.
+    shm_size: 8g
+    mem_limit: ${APP_MEM:-335g}
+    memswap_limit: ${APP_MEM:-335g}
+    stdin_open: true
+    tty: true
+    # GPU: add -f compose.gpu.yml (run_mt_aws.sh does when nvidia-smi works).
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  mtpids_net:
+    name: mtpids_net
+
+volumes:
+  mtpids_pgdata:
+    name: mtpids_pgdata

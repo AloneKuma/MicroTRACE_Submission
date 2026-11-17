@@ -1,0 +1,7 @@
+# No-History ablation (worklog Q-3, decided by the user 2026-11-16): no fault, sent from the run's
+# No-History identity variant (mtcore.exp3.nohistory: every resolved identity takes the key's
+# latest mapping for the whole run). Its `full` pass is No-History; compare with nofault/full.
+version: faultplan.v0
+seed: 0
+base_variant: no_history
+faults: []

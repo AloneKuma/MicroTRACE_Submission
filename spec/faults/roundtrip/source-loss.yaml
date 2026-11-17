@@ -1,0 +1,12 @@
+# Roundtrip fault plan: source loss (5 % of eBPF records)
+# Stage: source — faultinject drops before sequencing; no gap record produced.
+# Selector: EBPF source only.
+# Expected reconcile: received + source-dropped == base; no transit gap expected.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: source-loss-ebpf-5pct
+    kind: loss
+    stage: source
+    rate: 0.05
+    select: {sources: [EBPF]}

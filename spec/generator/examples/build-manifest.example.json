@@ -1,0 +1,123 @@
+{
+  "manifest_version": "build-manifest.v0",
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "split": "PILOT",
+  "world_name": "Small",
+  "scenario_id": "a1_lid_ds_upload",
+  "scenario_variant": 0,
+  "scenario_catalogue_version": "5f2b3c8d7e9a1c0e4f1b8a2c9d3e5f7a",
+  "generator_version": "v0.1-alpha+20261009",
+  "generated_at": "2026-10-09T14:23:45Z",
+  "generator_spec_version": "generator-spec.v0",
+  "capture_profile": "research-superset-v0",
+  "rule_evaluation_mode": "candidates",
+  "seeds": {
+    "generator_seed": 42,
+    "scenario_seed": 100,
+    "observability_seed": 999
+  },
+  "hashes": {
+    "base_stream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "truth_sha256": "2c26b46911185131006ba5991585e2955b40d2f6c0c8a0b08d0c4f30a00e3c80",
+    "manifest_sha256": "fcde2b2edba56bf408601fb721fe9b5348cc61f6f4d028d436b69c8e57ab64e5"
+  },
+  "stream_statistics": {
+    "total_envelopes": 18500,
+    "logical_id_count": 18500,
+    "event_time_range": {
+      "start_unix_seconds": 1696869000,
+      "end_unix_seconds": 1696873200
+    },
+    "events_per_source_family": {
+      "gateway": 1200,
+      "audit": 8300,
+      "ebpf": 6500,
+      "context": 2000,
+      "heartbeat": 500
+    }
+  },
+  "truth_statistics": {
+    "total_actions": 12,
+    "total_findings": 45,
+    "total_links": 8,
+    "findings_by_state": {
+      "PRESENT": 12,
+      "ABSENT": 20,
+      "UNOBSERVABLE": 13
+    },
+    "findings_by_type": {
+      "A1": 3,
+      "A2": 2,
+      "B1": 1,
+      "B2": 0,
+      "B3": 2,
+      "C1a": 1,
+      "C1b": 0,
+      "D1": 1,
+      "E1": 0,
+      "E2": 0,
+      "F1": 1,
+      "G1a": 2,
+      "G2": 1,
+      "H1": 0,
+      "H2": 1,
+      "H3": 1,
+      "H4": 0
+    }
+  },
+  "template_usage": {
+    "source_templates": [
+      {
+        "source": "BETH",
+        "pool": "DEV",
+        "record_count": 450,
+        "record_ids": ["beth_host1_session2", "beth_host3_session5"],
+        "transformation": "Relative boot time → absolute event_time; extracted syscall sequences",
+        "converter_version": "v0.2",
+        "converter_command": "python dataset-review/converters/beth_converter.py --input datasets/raw/BETH/ --output dataset-review/output/beth/ --split training"
+      },
+      {
+        "source": "scripted",
+        "pool": "DEV",
+        "record_count": 300
+      }
+    ],
+    "scripted_distributions": [
+      {
+        "source": "LID-DS-2021",
+        "reason": "template not available (PHP_CWE-434 training split not yet converted)"
+      }
+    ]
+  },
+  "artifact_versions": {
+    "P_A": "p_a.v0.hash=a1b2c3d4e5f6a7b8",
+    "I_A2": "i_a2.v0.hash=b2c3d4e5f6a7b8c9",
+    "S_B1": "beth_baseline.v0.hash=c3d4e5f6a7b8c9d0",
+    "E_D1": "beth_token_readers.v0.hash=d4e5f6a7b8c9d0e1"
+  },
+  "observability_profile": "clean",
+  "completeness_guarantees": {
+    "gateway": {
+      "expected_complete": true,
+      "loss_percentage": 0
+    },
+    "audit": {
+      "expected_complete": true,
+      "loss_percentage": 0
+    },
+    "ebpf": {
+      "expected_complete": true,
+      "loss_percentage": 0
+    },
+    "context": {
+      "expected_complete": true,
+      "loss_percentage": 0
+    }
+  },
+  "archive_paths": {
+    "base_stream": "datasets/generated/PILOT/550e8400-e29b-41d4-a716-446655440000/base-stream.envelope",
+    "truth_directory": "datasets/generated/PILOT/550e8400-e29b-41d4-a716-446655440000/restricted/",
+    "archive_directory": "datasets/generated/PILOT/550e8400-e29b-41d4-a716-446655440000/archive/"
+  },
+  "notes": "Scenario variant 0 (rulebook-shaped attack); clean observability; all sources operational"
+}

@@ -1,0 +1,14 @@
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.patch text eol=lf
+Dockerfile text eol=lf
+*.pdf binary
+*.png binary
+*.xlsx binary
+*.gz binary
+*.yaml text eol=lf
+*.yml text eol=lf
+*.tsv text eol=lf
+*.tf text eol=lf
+*.sql text eol=lf

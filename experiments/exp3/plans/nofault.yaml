@@ -1,0 +1,4 @@
+# No fault: the reference condition (live, real-time replay; Exp. 1 latency is measured here).
+version: faultplan.v0
+seed: 0
+faults: []

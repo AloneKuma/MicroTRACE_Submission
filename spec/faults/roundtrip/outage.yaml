@@ -1,0 +1,17 @@
+# Roundtrip fault plan: outage (all eBPF records in a 60-second window)
+# Stage: transit — shipper drops and sends GapNotice for the window.
+# The window covers the middle minute of a 1-hour Small dev run.
+# eBPF, not AUDIT: the round-trip replays one node's shipper file, and AUDIT
+# records live on a different node, so an AUDIT outage would drop nothing.
+# Expected reconcile: all dropped eBPF records are in the transit fault log and
+# the archive has a DROPPED_BEFORE gap record for the eBPF lane.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: ebpf-outage-t30m
+    kind: outage
+    stage: transit
+    select:
+      sources: [EBPF]
+      from: "2024-01-01T00:30:00Z"
+      to: "2024-01-01T00:31:00Z"

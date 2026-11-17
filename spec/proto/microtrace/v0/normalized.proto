@@ -1,0 +1,111 @@
+// MicroTRACE Gap 1 schema v0: normalized evidence (norm.events.v0 and the
+// agent.* restreams). Carries the typed source record plus attributes that
+// normalization derived with a recorded context version.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "microtrace/v0/common.proto";
+import "microtrace/v0/ebpf.proto";
+import "microtrace/v0/audit.proto";
+import "microtrace/v0/gateway.proto";
+import "microtrace/v0/kyverno.proto";
+import "microtrace/v0/context.proto";
+import "microtrace/v0/offnode.proto";
+
+// Attribution derived from an audit event. Each field is absent when the
+// source did not supply it; nothing is inferred from names alone.
+message AuditDerived {
+  // From user.extra["authentication.kubernetes.io/credential-id"], "JTI=" removed.
+  optional string used_credential_id = 1;
+  // From annotations["authentication.kubernetes.io/issued-credential-id"] on a
+  // TokenRequest create.
+  optional string issued_credential_id = 2;
+  // From user.extra[".../pod-uid"] and [".../pod-name"]: the Pod binding
+  // that the API server validates when the token is used.
+  optional string bound_pod_uid = 3;
+  optional string bound_pod_name = 4;
+  // From user.extra[".../node-name"] / [".../node-uid"]: not verified at use.
+  optional string unverified_node_name = 5;
+  optional string unverified_node_uid = 6;
+  // Authenticated principal; absent for failed authentication.
+  optional EntityRef principal = 7;
+  bool authentication_failed = 8;
+  // Target Pod UID for pods/<subresource> requests, resolved from namespace
+  // and name through the time-indexed Pod history. Absent if ambiguous.
+  optional string resolved_target_pod_uid = 9;
+  // Observed-source key for unauthenticated requests (last sourceIPs entry).
+  string observed_source = 10;
+  // Caller Pod from independent (non-audit) telemetry. Conditional: see
+  // CRED-CALLER-ATTRIBUTION. Audit records carry no source port, so this is
+  // not a per-socket match: it is the single Pod with an eBPF-observed
+  // connection to the API server (service VIP or endpoint, canonicalized)
+  // from the request's peer address that was open at request time. Clients
+  // reuse long-lived HTTP/2 connections, so the connection may have opened
+  // long before the request; connections already open at sensor start come
+  // from a socket snapshot. Absent if none or more than one Pod qualifies.
+  optional string attributed_caller_pod_uid = 11;
+  // Caller Pod from the last source_ips entry (the TCP peer; earlier entries
+  // are client-supplied and ignored) resolved through the time-indexed Pod IP
+  // history. Absent when the peer is a node or host-network address, a NAT
+  // address, or ambiguous at request time.
+  optional string peer_caller_pod_uid = 12;
+}
+
+message EbpfDerived {
+  // Pod resolved from cgroup/container identity for an unambiguous interval.
+  optional string pod_uid = 1;
+  string container_name = 2;
+  // Logical ID of the lineage root ProcessKey (see kafka-contract.md).
+  string lineage_id = 3;
+  // True when NamespaceDetail.after equals the node's init namespaces for
+  // mnt and pid.
+  bool host_namespace_after = 4;
+  // Token owner resolved from FileIdentity.projected, if the file is a
+  // projected ServiceAccount token.
+  optional ProjectedVersion token_file = 5;
+  // Resolved remote endpoint class: cluster Pod, cluster Service, or external.
+  string remote_class = 6;
+  optional string remote_pod_uid = 7;
+  // Sensitive-data class from the declared data-class set (H4), if matched.
+  string data_class = 8;
+}
+
+// Attribution derived from an admission decision. The restreamer emits one
+// agent.E record per container of the admitted Pod, so the E key
+// (Pod UID, container name) is defined for E1.
+message AdmissionDerived {
+  optional string pod_uid = 1;
+  string container_name = 2;
+}
+
+message NormalizedEvent {
+  string event_id = 1;
+  Source source = 2;
+  string source_native_id = 3;
+  string source_stage = 4;
+  optional string action_id = 5;
+  TimeInfo time = 6;
+  repeated EntityRef entities = 7;
+  oneof record {
+    RawEbpfRecord ebpf = 10;
+    AuditEvent audit = 11;
+    GatewayObservation gateway = 12;
+    AdmissionDecision kyverno = 13;
+    ObjectObservation context = 14;
+    DbAuditRecord db_audit = 15;
+    PathFlowRecord path_flow = 16;
+  }
+  oneof derived {
+    AuditDerived audit_derived = 20;
+    EbpfDerived ebpf_derived = 21;
+    AdmissionDerived admission_derived = 22;
+    OffNodeDerived offnode_derived = 23;
+  }
+  EvidenceRef evidence_ref = 30;
+  Completeness completeness = 31;
+  string normalizer_version = 32;
+  // Context-history version used for enrichment joins.
+  string context_version = 33;
+  string capture_manifest_version = 34;
+}

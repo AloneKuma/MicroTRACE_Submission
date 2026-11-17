@@ -1,0 +1,140 @@
+// MicroTRACE schema v0: node-to-receiver shipping protocol.
+// Semantics: spec/kafka/ship-contract.md. These messages travel on the gRPC
+// stream only; they are never Kafka records. No bytes fields: envelopes travel
+// as messages, keys as their components, hashes as hex strings.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+import "microtrace/v0/envelope.proto";
+import "microtrace/v0/keys.proto";
+
+service Ingest {
+  // One stream per shipper connection. The receiver answers Hello with
+  // Welcome, then acks or nacks each batch.
+  rpc Ship(stream NodeMessage) returns (stream ReceiverMessage);
+}
+
+enum Lane {
+  LANE_UNSPECIFIED = 0;
+  // Escape-class records: sent one at a time, never batched or enriched.
+  PRIORITY = 1;
+  NORMAL = 2;
+}
+
+message NodeMessage {
+  oneof msg {
+    Hello hello = 1;
+    Batch batch = 2;
+    GapNotice gap_notice = 3;
+    Watermark watermark = 4;
+  }
+}
+
+// First message on a stream. node_id must equal the node ID in the client
+// certificate.
+message Hello {
+  string node_id = 1;
+  string boot_id = 2;
+  string agent_instance = 3;
+  string schema_version = 4;
+}
+
+message BatchHeader {
+  string node_id = 1;
+  string boot_id = 2;
+  string agent_instance = 3;
+  Lane lane = 4;
+  // Sequence of the first item; items carry first_seq .. first_seq+count-1.
+  uint64 first_seq = 5;
+  uint32 count = 6;
+  string schema_version = 7;
+  // Transport compression applied by gRPC, recorded for audit ("none", "gzip").
+  string compression = 8;
+  // Lowercase hex SHA-256 over the concatenation, in order, of each item's
+  // deterministic serialization.
+  string payload_sha256 = 9;
+  // The sender writes no later item on this lane with an event time before this.
+  google.protobuf.Timestamp low_watermark = 10;
+}
+
+message ShipItem {
+  uint64 seq = 1;
+  string topic = 2;
+  KeyType key_type = 3;
+  // Key component values in the topic's declared order (topics.yaml); the
+  // receiver encodes the Kafka key from them (kafka-contract.md, "Keys").
+  repeated string key_components = 4;
+  Envelope envelope = 5;
+}
+
+message Batch {
+  BatchHeader header = 1;
+  repeated ShipItem items = 2;
+}
+
+// The sender cannot deliver first_seq..last_seq on this lane (for example,
+// spool overflow). The receiver records the loss and moves past it.
+message GapNotice {
+  Lane lane = 1;
+  uint64 first_seq = 2;
+  uint64 last_seq = 3;
+  GapReason reason = 4;
+  string detail = 5;
+  // Event-time range of the lost items, when the sender knows it.
+  google.protobuf.Timestamp from = 6;
+  google.protobuf.Timestamp to = 7;
+  // Sources of the lost items.
+  repeated Source sources = 8;
+  // What the lost items were, when the sender knows (2026-11-17, scoped loss): "keys=k1|k2", the
+  // witness keys of every lost item (mtcore.orchestrator.keys.loss_keys). Empty: unknown, so the
+  // gap covers every key. The receiver appends it to the gap's scope.
+  string scope = 9;
+}
+
+// Advances a lane's watermark when no batch is pending.
+message Watermark {
+  Lane lane = 1;
+  google.protobuf.Timestamp low_watermark = 2;
+}
+
+message ReceiverMessage {
+  oneof msg {
+    Welcome welcome = 1;
+    Ack ack = 2;
+    Nack nack = 3;
+    Reject reject = 4;
+  }
+}
+
+message LanePosition {
+  Lane lane = 1;
+  uint64 next_expected_seq = 2;
+}
+
+// The receiver's durable position for (node_id, boot_id) per lane. The
+// shipper resends from here.
+message Welcome {
+  repeated LanePosition positions = 1;
+}
+
+// Every item on the lane up to and including acked_through is in Kafka.
+message Ack {
+  Lane lane = 1;
+  uint64 acked_through = 2;
+}
+
+// Batch not accepted; resend the lane from from_seq.
+message Nack {
+  Lane lane = 1;
+  uint64 from_seq = 2;
+  string reason = 3;
+}
+
+// The stream is refused (identity mismatch, bad hash, topic not allowed,
+// unsupported schema). The receiver closes the stream after sending it.
+message Reject {
+  string reason = 1;
+}

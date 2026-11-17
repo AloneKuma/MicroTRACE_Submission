@@ -1,0 +1,48 @@
+# Example fault plan (faultplan.v0): one fault of each kind. Not an
+# Experiment 3 variant; real variants are predeclared before HELD_OUT runs.
+version: faultplan.v0
+seed: 20261008
+faults:
+  - id: loss-transit-10
+    kind: loss
+    stage: transit
+    rate: 0.10
+  - id: loss-source-5
+    kind: loss
+    stage: source
+    rate: 0.05
+    select: {sources: [GATEWAY]}
+  - id: audit-outage
+    kind: outage
+    stage: transit
+    select: {sources: [AUDIT], from: "2026-10-08T12:05:00Z", to: "2026-10-08T12:06:00Z"}
+  - id: hide-contradiction
+    kind: suppress
+    stage: transit
+    select: {logical_ids: ["ev-0123456789abcdef0123456789abcdef"]}
+  - id: node-skew
+    kind: skew
+    stage: source
+    offset: 250ms
+    declare_uncertainty: false
+  - id: late-ebpf
+    kind: delay
+    stage: source
+    delay: 3s
+    rate: 0.2
+    select: {sources: [EBPF]}
+  - id: agent-stopped
+    kind: stop
+    stage: source
+    after: "2026-10-08T12:20:00Z"
+  - id: blind-file-reads
+    kind: blind
+    stage: source
+    after: "2026-10-08T12:15:00Z"
+    select: {event_families: [file.read]}
+  - id: forged-connects
+    kind: forge
+    stage: source
+    after: "2026-10-08T12:18:00Z"
+    count: 5
+    select: {event_families: [net.connect]}

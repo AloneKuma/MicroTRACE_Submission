@@ -1,0 +1,183 @@
+// MicroTRACE Gap 1 schema v0 (design draft, not validated on a cluster).
+// Shared value types. Field numbers are frozen once a run is evaluated; a
+// removed field is `reserved` by number and name, never reused.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+
+// Which source clock supplied TimeInfo.event_time (contracts.md, common rules).
+enum TimeBasis {
+  TIME_BASIS_UNSPECIFIED = 0;
+  // Audit: requestReceivedTimestamp, used for request initiation.
+  AUDIT_REQUEST_RECEIVED = 1;
+  // Audit: stageTimestamp, used for the recorded outcome of a stage.
+  AUDIT_STAGE = 2;
+  // eBPF: kernel monotonic time converted by a versioned per-node clock model.
+  EBPF_MONOTONIC_CORRECTED = 3;
+  // Gateway: proxy observation time for the request or response.
+  GATEWAY_OBSERVATION = 4;
+  // Kyverno: admission time, only when exported or reliably joined.
+  KYVERNO_ADMISSION = 5;
+  // Watch collector: time the object state became known (knowledge time),
+  // not the time the object changed.
+  WATCH_OBSERVATION = 6;
+  // No trustworthy source time; event_time_uncertain must be true.
+  TIME_BASIS_UNKNOWN = 7;
+  // Database audit: server clock time of statement completion.
+  DB_AUDIT_SERVER = 8;
+  // Path observer: flow start/end from the observer's clock.
+  PATH_OBSERVER_FLOW = 9;
+}
+
+message TimeInfo {
+  // Timestamp exactly as reported by the source, if any.
+  google.protobuf.Timestamp source_time = 1;
+  // Time selected for ordering after correction (UTC).
+  google.protobuf.Timestamp event_time = 2;
+  // Time normalization accepted the record. Never silently substituted for
+  // event_time.
+  google.protobuf.Timestamp ingest_time = 3;
+  // Bound on the error of event_time, not merely a measured offset.
+  uint64 clock_uncertainty_ns = 4;
+  string clock_model_version = 5;
+  TimeBasis event_time_basis = 6;
+  bool event_time_uncertain = 7;
+}
+
+enum StrengthClass {
+  STRENGTH_CLASS_UNSPECIFIED = 0;
+  // Instance identity (UID, JTI, process key, audit ID, socket cookie).
+  STRENGTH_HIGH = 1;
+  // Instance-scoped but collision-prone (image digest, resolved file identity
+  // without a version index).
+  STRENGTH_MEDIUM = 2;
+  STRENGTH_LOW = 3;
+  // Class/context key (namespace, node, ServiceAccount name). Never confirms
+  // a link.
+  STRENGTH_CONTEXT = 4;
+}
+
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  POD = 1;
+  CONTAINER = 2;
+  PROCESS = 3;
+  PROCESS_LINEAGE = 4;
+  NODE = 5;
+  SERVICE_ACCOUNT = 6;
+  USER = 7;
+  GROUP = 8;
+  NAMESPACE = 9;
+  IMAGE = 10;
+  HTTP_REQUEST = 11;
+  AUDIT_ACTION = 12;
+  RBAC_OBJECT = 13;
+  TOKEN_INSTANCE = 14;
+  FILE_OBJECT = 15;
+  NETWORK_ENDPOINT = 16;
+  FLOW = 17;
+  HOST_PROCESS = 18;
+  UNAUTHENTICATED_SOURCE = 19;
+}
+
+message EntityRef {
+  EntityType type = 1;
+  // Absent when not established. A UID is never fabricated.
+  optional string uid = 2;
+  string namespace = 3;
+  string name = 4;
+  StrengthClass strength_class = 5;
+}
+
+enum GapReason {
+  GAP_REASON_UNSPECIFIED = 0;
+  TRUNCATED = 1;
+  DROPPED_BEFORE = 2;
+  SOURCE_IDLE = 3;
+  JOIN_UNCERTAIN = 4;
+  POLICY_EXCLUDED = 5;
+  BODY_STRIPPED = 6;
+  WATCH_RELIST_GAP = 7;
+  FIELD_ABSENT = 8;
+  EXPORT_ERROR = 9;
+  COLLECTOR_LAG = 10;
+  PROVIDER_LIMIT = 11;
+  CONDITIONAL_JOIN_UNVALIDATED = 12;
+  DELIVERY_UNESTABLISHED = 13;
+}
+
+message Gap {
+  GapReason reason = 1;
+  // Machine-readable scope, e.g. "family=file.read", "field=user.extra".
+  string scope = 2;
+  string detail = 3;
+  google.protobuf.Timestamp from = 4;
+  google.protobuf.Timestamp to = 5;
+}
+
+// Known observation gaps. An empty list means no gap is known, not that
+// completeness has been proven.
+message Completeness {
+  repeated Gap gaps = 1;
+}
+
+enum ProtectionClass {
+  PROTECTION_CLASS_UNSPECIFIED = 0;
+  ORDINARY = 1;
+  // RBAC request/response objects retained for F2 reconstruction.
+  PROTECTED_RBAC_BODY = 2;
+  // Captured HTTP body chunks (gateway).
+  PROTECTED_HTTP_BODY = 3;
+  // Other raw source records kept in the immutable archive.
+  PROTECTED_RAW_RECORD = 4;
+}
+
+// Pointer to protected raw evidence. Credential bytes are never archived.
+message EvidenceRef {
+  string archive_id = 1;
+  string object_key = 2;
+  // SHA-256 of the archived bytes, for integrity only (not a logical ID).
+  string sha256_hex = 3;
+  ProtectionClass protection = 4;
+}
+
+message TransportProvenance {
+  string topic = 1;
+  int32 partition = 2;
+  int64 offset = 3;
+}
+
+// Who can set a join-key component's value (design-spec 2, "Key origin").
+// UNSPECIFIED is treated as WORKLOAD: an unknown origin never confirms.
+enum KeyOrigin {
+  KEY_ORIGIN_UNSPECIFIED = 0;
+  // Set by the kernel, gateway (when minted), API server, admission controller
+  // or an off-node observer; code in a container cannot write it.
+  SENSOR = 1;
+  // Carried or written by application code, so a compromised workload sets it.
+  WORKLOAD = 2;
+}
+
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  EBPF = 1;
+  GATEWAY = 2;
+  KYVERNO = 3;
+  AUDIT = 4;
+  // Auxiliary cluster-state feed; not one of the four security sources.
+  CLUSTER_CONTEXT = 5;
+  // Off-node corroboration sources (offnode.proto); not among the four
+  // security sources.
+  DB_AUDIT = 6;
+  PATH_FLOW = 7;
+}
+
+// Named parameter applied to a decision. value_ms is absent until the
+// parameter is frozen from pilot data (parameter-register.md).
+message AppliedLimit {
+  string parameter = 1;
+  optional uint64 value_ms = 2;
+  string parameter_set_version = 3;
+}

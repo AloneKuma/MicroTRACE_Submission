@@ -1,0 +1,23 @@
+# Exp. 4 timing session pass list (T1-T5, heldout-aws-plan.md section 8). APPROVED by the user 2026-11-16.
+# unit: name; system go (archived-finding replay) or a commands.tsv entry; config: configs.tsv name (go)
+# or commands.tsv name; workload: workloads.tsv name (go); workers: parallel GO processes; timed: yes =
+# warm-up (the accuracy step) + REPEATS rotated timed repeats, no = accuracy step only; train: yes = one
+# timed training step first (T4); prep: yes = one untimed setup step at the start.
+# Table rows (natural rate m1): Full, No-Index, unbounded paths, reduced K, L, T; the exhaustive
+# reference is accuracy only. ORTHRUS: training timed once (T4); detection not timed separately (Q2 c). Finding-rate sweep: Full and No-Index at m2, m4, m8. ORTHRUS last.
+# workers: 8, except m8: 6 = floor(0.6 x 128 GB / (8 runs x 1.5 GB peak per run in the development dry run)).
+unit	system	config	workload	workers	timed	train	prep
+ref_m1	go	exhaustive	m1	8	no	no	no
+full_m1	go	full	m1	8	yes	no	no
+noindex_m1	go	no_index	m1	8	yes	no	no
+unbounded_m1	go	unbounded	m1	8	yes	no	no
+reduced_k_m1	go	reduced_k	m1	8	yes	no	no
+reduced_l_m1	go	reduced_l	m1	8	yes	no	no
+reduced_t_m1	go	reduced_t	m1	8	yes	no	no
+full_m2	go	full	m2	8	yes	no	no
+noindex_m2	go	no_index	m2	8	yes	no	no
+full_m4	go	full	m4	8	yes	no	no
+noindex_m4	go	no_index	m4	8	yes	no	no
+full_m8	go	full	m8	6	yes	no	no
+noindex_m8	go	no_index	m8	6	yes	no	no
+orthrus	orthrus	orthrus	-	-	no	yes	yes

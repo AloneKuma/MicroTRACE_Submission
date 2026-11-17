@@ -1,0 +1,181 @@
+# Development parameter set for the agents (build step 4).
+#
+# NOT the evaluated configuration. Every value here is a placeholder for
+# tests on fixture streams; the frozen set is chosen on PILOT data only
+# (docs/design/parameter-register.md) and gets its own version. Findings carry
+# parameter_set_version, so a result built on this file says so.
+parameter_set_version: DEV-UNFROZEN
+
+# Stream time (seconds).
+lateness_s: 2
+
+# What each node's shipper carries (Source names). A node's SOURCE_IDLE gap
+# stops only rules on these sources (and, for EBPF, only that node's events).
+# Nodes not listed use "default". Omit the section to treat an idle node as
+# covering every source.
+shipped_sources:
+  default: [EBPF]
+
+# Rule windows (seconds). Count rules use tumbling windows aligned to the Unix
+# epoch; join rules (G2, H4, E3, H5) use a window anchored at the first half.
+windows_s:
+  W_B1: 300
+  W_B2: 60
+  W_B3: 60
+  W_G2: 10
+  W_H1: 300
+  W_H3: 300
+  W_H: 120
+  W_E: 600
+  W_H5: 120
+  W_G1a_ml: 300
+  W_w: 600
+
+# Counts and ratios.
+thresholds:
+  N_B2: 10
+  N_H3: 20
+  rho_H5: 0.5
+
+# Conditional types: off means the rule abstains with
+# CONDITIONAL_JOIN_UNVALIDATED.
+gates:
+  G_D2: false
+  G_E3: false
+  G_F2: false
+  G_G1b: false
+
+# Isolation Forest path (B1, B2, B3, G1a, H1). Thresholds apply to the
+# negated sklearn score_samples (larger is more anomalous).
+ml:
+  enabled: true
+  N_cold: 3
+  gamma: {B1: 0.6, B2: 0.6, B3: 0.6, G1a: 0.6, H1: 0.6}
+  forest: {n_estimators: 100, max_samples: 256, max_features: 1.0, bootstrap: false, random_state: 20261008}
+  models: {}            # agent -> path of the exported model artifact
+
+# Severity and evidence confidence per finding type (not used by link scoring).
+reporting:
+  default: {severity: MEDIUM, confidence: 0.8}
+  overrides:
+    A1: {severity: LOW, confidence: 0.6}
+    A2: {severity: HIGH, confidence: 0.8}
+    B3: {severity: LOW, confidence: 0.5}
+    C1a: {severity: MEDIUM, confidence: 0.6}
+    C1b: {severity: HIGH, confidence: 0.9}
+    C2: {severity: LOW, confidence: 0.6}
+    D1: {severity: HIGH, confidence: 0.9}
+    E1: {severity: LOW, confidence: 0.9}
+    F1: {severity: HIGH, confidence: 0.9}
+    F2: {severity: HIGH, confidence: 0.9}
+    G1a: {severity: LOW, confidence: 0.5}
+    G2: {severity: HIGH, confidence: 0.95}
+    H2: {severity: LOW, confidence: 0.5}
+    H4: {severity: HIGH, confidence: 0.7}
+    H5: {severity: HIGH, confidence: 0.7}
+
+# Declared artifacts and baselines. Each is versioned by the SHA-256 of its
+# canonical JSON; the version goes on every finding that uses it.
+artifacts:
+  P_A:                       # pattern_id -> pattern class
+    sqli-union: sqli
+    sqli-tautology: sqli
+    path-traversal: traversal
+    cmd-injection: cmdi
+  I_A2:                      # pattern class -> response indicator ids
+    sqli: [sql-error-dump, row-dump]
+    traversal: [passwd-content]
+    cmdi: [command-output]
+  Z_C:
+    runtime_sockets: [/run/containerd/containerd.sock, /var/run/docker.sock, /run/crio/crio.sock]
+  E_D1:                      # workload -> executables expected to read its token
+    checkout: [/app/checkout]
+    payments: [/app/payments]
+  E_E2:                      # workload -> declared post-start writes
+    checkout: [{writer: /app/entrypoint.sh, path_prefix: /app/cache/}]
+  E_E2_package_paths: [/usr/bin/, /usr/local/bin/, /usr/lib/, /bin/, /sbin/]
+  E_F1:                      # workload -> declared privileged helpers
+    checkout: [/usr/bin/sudo]
+  Q_B1:                      # principal -> max distinct (group, resource, namespace) per W_B1
+    system:serviceaccount:shop:checkout: 4
+    system:serviceaccount:shop:payments: 4
+  Q_B3:                      # principal -> max requests per W_B3
+    system:serviceaccount:shop:checkout: 60
+    system:serviceaccount:shop:payments: 60
+  Q_G1a:                     # [source workload, destination workload, port]
+    - [frontend, checkout, 8080]
+    - [checkout, payments, 8080]
+    - [payments, orders-db, 5432]
+  Q_H1:                      # workload -> max external bytes out per W_H1
+    checkout: 1000000
+    payments: 1000000
+  Q_H2:                      # workload -> declared external destinations ("ip:port")
+    checkout: ["203.0.113.10:443"]
+    payments: ["203.0.113.20:443"]
+  C_H4: [customer-pii, card-data]
+  Bnd_G1b:                   # [from namespace, to namespace] boundaries G1b may claim
+    - [shop, payments-ns]
+    - [shop, kube-system]
+  host_signatures: []        # H5: declared host-component flows ("ip:port")
+  authorizer_chain_known: true
+  external_groups: []        # F2: externally authenticated groups with no membership history
+  group_members:             # F2: declared group membership ("Kind:ns/name" or name)
+    system:masters: [User:cluster-admin]
+
+# Global Orchestrator (build step 5). UNFROZEN development values taken from
+# the proofs reference model (proofs/correlator_ref.py), for fixture tests
+# only; the parameter register (docs/design/parameter-register.md) has no
+# frozen value yet. Times in seconds. Witness types use WitnessType names.
+orchestrator:
+  status: UNFROZEN
+  W_w_s:                     # witness window per type
+    NETWORK_FLOW: 30
+    REQUEST_IDENTITY: 30
+    PROCESS_ANCESTRY: 60
+    HOST_TRANSITION: 60
+    CREDENTIAL_READ_TO_USE: 120
+    ADMISSION_INSTANCE: 300
+    CONTROL_PLANE_CAUSALITY_INSTANCE: 40
+    HOST_CONTEXT: 90
+    CONTROL_PLANE_CAUSALITY_CLASS: 40
+    IMAGE_CLASS: 300
+  eps_bar_s: 5               # uncertainty cap per witness (all types here)
+  A_s: 10                    # finding ordering time vs its supporting events
+  T_s: 10000                 # path span; also bounds sealing
+  beta_s: 8                  # max off-node receipt delay
+  beta_onset_s: 8            # ship-latency bound trusting an epoch trigger's own evidence
+  lateness_s: 2              # applied once to the input watermark
+  max_idle_s: 10             # producer instance silence before exclusion
+  heartbeat_ms: 1000
+  K: 2                       # paths kept per anchor
+  L: 6                       # max findings per path
+  lambda: 1.0
+  q_unmapped: 0.6
+  q_transition:              # tactic-transition table (A2): by direction along the ATT&CK
+    forward: 0.90            # tactic order (finding_pb2.Tactic values); register bands:
+    same: 0.85               # plausible, neutral, unusual. UNFROZEN
+    backward: 0.50
+  W_nw_s: 60                 # No-Witness window (D-15): largest PRESENT link gap in PILOT, provisional
+  q_nw: 0.8                  # No-Witness link strength (ablation only)
+  q_w:
+    NETWORK_FLOW: 0.9
+    REQUEST_IDENTITY: 0.9
+    PROCESS_ANCESTRY: 0.95
+    HOST_TRANSITION: 0.95
+    CREDENTIAL_READ_TO_USE: 0.85
+    ADMISSION_INSTANCE: 0.8
+    CONTROL_PLANE_CAUSALITY_INSTANCE: 0.9
+    HOST_CONTEXT: 0.7
+  gates:                     # conditional witness types (rulebook status: conditional)
+    REQUEST_IDENTITY: false
+    CREDENTIAL_READ_TO_USE: false
+    HOST_CONTEXT: false
+    ADMISSION_INSTANCE: false
+    CONTROL_PLANE_CAUSALITY_INSTANCE: false
+  ablations: []              # Exp. 2-4 switches, e.g. [no_index]; empty = full design
+
+# TGS (build step 6). UNFROZEN: the overlap threshold is set on the Exp. 5
+# development set only (tgs-contract.md section 5).
+tgs:
+  status: UNFROZEN
+  template_min_overlap: 0.5   # share of a template's required stages a member finding must cover

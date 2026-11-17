@@ -1,0 +1,10 @@
+# Exp. 4 GO configurations: orchestrator overrides (JSON) on the pass list's frozen parameter file.
+# The frozen file itself is never changed. All values APPROVED by the user 2026-11-16 (worklog section 4); L and T derived on 8 PILOT SCORE runs (test host dry run 2026-11-16).
+config	overrides	note
+full	{}	Full MicroTRACE: the frozen file as is (K 10, L 6, T 10000 s)
+no_index	{"ablations": ["no_index"]}	No-Index: every processed pair tested (ablations.py no_index); Property 3 predicts the same links
+unbounded	{"K": 1000000, "L": 1000000, "T_s": 1000000000}	Unbounded paths (indexed): K, L, T far above any run (APPROVED)
+exhaustive	{"ablations": ["no_index"], "K": 1000000, "L": 1000000, "T_s": 1000000000}	Reference: No-Index and unbounded paths (score.py: "an exhaustive, unbounded run"); accuracy only
+reduced_k	{"K": 2}	Reduced K (APPROVED 2: smallest value of the 2026-11-06 FIT sweep)
+reduced_l	{"L": 2}	Reduced L (APPROVED rule: 90th-percentile retained path length minus one, at least 2; PILOT dry run p90 = 3, so 2)
+reduced_t	{"T_s": 60}	Reduced T (APPROVED rule: median retained path span rounded up to a minute; PILOT dry run median 10.8 s, so 60 s)

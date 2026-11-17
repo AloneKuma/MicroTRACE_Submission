@@ -1,0 +1,111 @@
+# KAIROS and ORTHRUS baseline settings, FROZEN 2026-11-11 (plan step B4,
+# docs/plans/kairos-orthrus-our-data-plan.md; decisions 2026-11-01 and 2026-11-04 by the user,
+# docs/plans/ROADMAP.md section 4). A record, not read by code. Every value is decided; the
+# development scripts do all of it except items marked `script: todo` (held-out steps, KAIROS
+# run 2, distinct-node report), which must be scripted before the held-out session without
+# changing any value here. Held-out outcomes do not change any of it.
+# Hashes are sha256 (first 12 hex where shortened) of the named file; script commits are the
+# last commit touching each file when this record was written.
+version: pidsmaker.v0
+frozen: 2026-11-11
+
+tool:
+  pidsmaker:
+    repo: https://github.com/ubc-provenance/PIDSMaker
+    tag: 3.0.0
+    commit: 438a05a7c55256f639e5b5945cf4828fe3ee078e
+    patches:                    # experiments/baselines/pidsmaker/patches/*.patch, applied in glob order
+                                # (eval-every-epoch, mt-datasets, tgn-chunked-flush; disjoint files)
+      mt-datasets.patch: 82a7e8cc667c53e92493a7803fd903010a6c10d9d56f80b3567dc124ebcc622f
+      tgn-chunked-flush.patch: 8cf72008cb9100fd4e878cdfb4406eccf0738fcb6c2b73b5abd48dd711c28091
+      eval-every-epoch.patch: d1fc48c633e6ddc8cfc92f95ebdf061d7c1ccb027c267b8b1ff329f6f8b53f8f
+    checked: >-
+      2026-11-11: the test-host tree (~/microtrace-baselines/pidsmaker/PIDSMaker) equals tag 3.0.0
+      plus these three patches (fresh apply diffed with no difference); config files unmodified.
+      run_mt_aws.sh clones --branch 3.0.0 --depth 1 (the same tag; commit not re-checked there).
+  orthrus_authors:              # DEPIMPACT tracer used by both ORTHRUS rows
+    repo: https://github.com/ubc-provenance/orthrus
+    commit: e7f25dfee1ddd182a955b88f8a90a8cbd4a8e543
+    depimpact_utils.py: f7dcdce24c3433c5c5a7349d600f250d254857de5d9bc49e03ae92ab7b54293d
+
+models:
+  kairos:
+    config: config/kairos.yml   # PIDSMaker default, unchanged
+    config_sha256: 989661356ccb4e055ae98015dd8153f30e1e210c3cf111db44ce6705f79e42c7
+    detection: threshold_method max_val_loss, use_kmeans False (its best_model_selection best_adp is ignored)
+  orthrus:
+    config: config/orthrus.yml  # PIDSMaker default, unchanged (k-means top-30, default threshold)
+    config_sha256: c2e31a0d18f3e0c7e89d5ad931a8e2c277b9b3b8fe39028dea0aa7578ca502a8
+    includes: config/default.yml  # _include_yml: default
+    includes_sha256: 7af6adaac6903cd450c23a3c225d9ffa6b37b24c2b7a53e2cdeaa0b647188d5c
+    detection: threshold_method max_val_loss, use_kmeans True, kmeans_top_K 30 (from default.yml)
+  merged_into_every_run: config/experiments/uncertainty/none.yml   # sets run_evaluation each_epoch
+  merged_sha256: 1f834b5f28fad640e1835ebe0bd13c2bcd1a03a9ab88b147a58f562629195968
+  extra_args: "--training.deterministic=True"   # MT_ARGS in run_mt_aws.sh; no other setting changed
+  epoch_rule: >-
+    lowest mean validation edge loss over edge_losses/val/model_epoch_N/*.csv (equals PIDSMaker's
+    logged Val Loss), validation after every epoch (eval-every-epoch.patch); PIDSMaker's own
+    best_model_selection pick is ignored; ties go to the earlier epoch; stats_*.pth never opened
+    (mt_detected.py)
+  flagged_nodes: y_hat of the chosen epoch's result_model_epoch_N.pth, mapped to node UUIDs
+
+training:
+  data: >-
+    PILOT FIT half with every scenario-action event removed (144 training + 26 validation runs),
+    the data our detectors were fitted on; no new Benign runs (decided 2026-11-01). Validation runs
+    = 0.15 of the FIT half, chosen by SHA-256 of the run ID (convert.val_runs)
+  converter: src/python/mtcore/baselines/provenance/convert.py   # one run = one graph = one day
+  per_test_set: >-
+    one training per test set (development: MT_PILOT, MT_CASES; held-out: HELD_OUT,
+    HELD_OUT-cases), the test set registered as test (ORTHRUS's word2vec reads its runs).
+    script: todo (run_mt_aws.sh has only the MT_PILOT / MT_CASES steps)
+  kairos_repeat: >-
+    held-out session trains KAIROS a second time per test set: run 1 is reported, run 2 only
+    measures run-to-run change. Held-out training runs on CPU on the m7i.8xlarge analysis host
+    (user 2026-11-11), so the development GPU-variation caveat does not apply; environment only,
+    no setting changes.
+    script: todo (needs its own results name and a forced restart, or PIDSMaker reuses cached stages)
+
+rows:
+  kairos:                       # Exp. 1, node level (provenance/score.py, detected.py)
+    step_rule: >-
+      a PRESENT host-type step is detected if a flagged node touches one of its own evidence
+      events; recall = detected / steps. Kept after development results (2026-11-04).
+    node_precision: flagged node is TP if an attack-step event touches it, else FP
+    also_report: distinct flagged nodes against the steps they cover
+    also_report_script: todo (done by hand on development data, ~/microtrace-kairos-explain on the host)
+  orthrus_seeded:               # Exp. 2 main ORTHRUS row (run_seeded_orthrus.sh, seeded.py)
+    graphs: built by mt_construct.py orthrus (PIDSMaker's orthrus.yml construction)
+    tracer: DEPIMPACT, component + degree, reads no model or anomaly score, no training (seeded_tracing.py)
+    seeds: >-
+      evidence nodes of the GO's Phase 2 findings (input_event_ids via event_map.csv), the same
+      findings the GO's main row uses; seeds absent from the graph are skipped and counted.
+      Held-out parameter set of those findings: see held_out_seed_params
+    held_out_seed_params: >-
+      the GO's main setting per set (user decisions 2026-11-11, main row changed 2026-11-12):
+      HELD_OUT seeds from findings of src/params/frozen/pilot-multistep-fit.K10.mlv2.yaml, HELD_OUT-cases from
+      src/params/frozen/fit-ri-on.K10.yaml (Targeted-type sets stay rules-only)
+    one_graph_per_seed: one graph per seed finding, no merging; a link found in several graphs counts
+      once; graphs with the same member findings are one incident
+    k: 10                       # seeded records --k 10, equal to the GO's K and SAGE's k
+  orthrus_context:              # Exp. 2/4 context row (score_mt_detected.sh)
+    rule: >-
+      authors' rule: trace every flagged node with DEPIMPACT; a run's graph is the union of its
+      traces; default threshold and top-30 k-means (orthrus.yml) kept
+    k: 10
+
+scoring:
+  links: member findings ordered by event_start and linked step to step via SAGE's project() ("ag")
+  paths: path recall rule A' (mtcore.harness.score)
+
+scripts:                        # commit, sha256 prefix
+  src/python/mtcore/baselines/provenance/convert.py: [612425f, b3b3ceccb110]
+  src/python/mtcore/baselines/provenance/score.py: [5b8300c, 29724f9d48de]
+  src/python/mtcore/baselines/provenance/detected.py: [8f43e74, 70d896a30779]
+  src/python/mtcore/baselines/provenance/seeded.py: [612425f, 3f6f6e50bfd6]
+  experiments/baselines/pidsmaker/mt_construct.py: [612425f, df11dbae13cc]
+  experiments/baselines/pidsmaker/mt_detected.py: [8f43e74, f4f64a389889]
+  experiments/baselines/pidsmaker/seeded_tracing.py: [612425f, e1614133f264]
+  experiments/baselines/pidsmaker/run_mt_aws.sh: [2747c8a, dbb838239a7c]
+  experiments/baselines/pidsmaker/run_seeded_orthrus.sh: [6adc250, b41c53077371]   # adds --k 10
+  experiments/baselines/pidsmaker/score_mt_detected.sh: [6adc250, e35b484d2538]    # adds --k 10

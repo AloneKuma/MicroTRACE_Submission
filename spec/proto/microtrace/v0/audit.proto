@@ -1,0 +1,83 @@
+// MicroTRACE Gap 1 schema v0: audit collector records (raw.audit.v0).
+// A typed subset of audit.k8s.io/v1 Event. Request/response objects are
+// referenced, never embedded. See spec/audit/collector-contract.md.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+
+message ExtraValues {
+  repeated string values = 1;
+}
+
+// Authenticated user info as recorded by the API server. For a request that
+// failed authentication the username is empty.
+message AuditUser {
+  string username = 1;
+  string uid = 2;
+  repeated string groups = 3;
+  // Keys include "authentication.kubernetes.io/credential-id" (used-token
+  // JTI, "JTI=<uuid>"), ".../pod-name", ".../pod-uid" (validated binding),
+  // ".../node-name", ".../node-uid" (not verified at use).
+  map<string, ExtraValues> extra = 4;
+}
+
+message ObjectRef {
+  string api_group = 1;
+  string api_version = 2;
+  string resource = 3;
+  string subresource = 4;
+  string namespace = 5;
+  string name = 6;
+  string uid = 7;
+  string resource_version = 8;
+}
+
+enum CollectorRoute {
+  COLLECTOR_ROUTE_UNSPECIFIED = 0;
+  LOG_FILE_TAIL = 1;
+  WEBHOOK = 2;
+  PROVIDER_EXPORT = 3;
+}
+
+// Where the collector read the record: file identity and offset, webhook
+// batch, or provider cursor. Used for end-to-end loss accounting.
+message CollectorPosition {
+  CollectorRoute route = 1;
+  uint64 file_dev = 2;
+  uint64 file_ino = 3;
+  uint64 file_offset = 4;
+  string webhook_batch_id = 5;
+  string provider_cursor = 6;
+}
+
+message AuditEvent {
+  string audit_id = 1;
+  // RequestReceived, ResponseStarted, ResponseComplete, or Panic.
+  string stage = 2;
+  // None, Metadata, Request, or RequestResponse, as applied by the policy.
+  string level = 3;
+  string request_uri = 4;
+  string verb = 5;
+  AuditUser user = 6;
+  optional AuditUser impersonated_user = 7;
+  // Client-supplied entries are untrusted; the last entry is the TCP peer,
+  // which may be a NAT address.
+  repeated string source_ips = 8;
+  string user_agent = 9;
+  ObjectRef object_ref = 10;
+  int32 response_code = 11;
+  string response_reason = 12;
+  // Includes "authentication.kubernetes.io/issued-credential-id" on a
+  // TokenRequest, and authorization decision/reason annotations.
+  map<string, string> annotations = 13;
+  google.protobuf.Timestamp request_received_timestamp = 14;
+  google.protobuf.Timestamp stage_timestamp = 15;
+  optional EvidenceRef request_object = 16;
+  optional EvidenceRef response_object = 17;
+  // Hash of the self-managed Policy file or ID of the provider policy record.
+  string policy_version = 18;
+  CollectorPosition position = 19;
+}

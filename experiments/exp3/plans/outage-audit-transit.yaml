@@ -1,0 +1,9 @@
+# PROPOSED (worklog section 4, P-2): AUDIT blocked on every node for 60 s, from 240 s after the
+# run's first event, transit stage.
+version: faultplan.v0
+seed: 3100
+faults:
+  - id: outage-audit-transit
+    kind: outage
+    stage: transit
+    select: {sources: [AUDIT], from: "start+240s", to: "start+300s"}

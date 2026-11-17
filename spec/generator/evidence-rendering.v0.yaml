@@ -1,0 +1,1871 @@
+schema_version: evidence-rendering.v0
+generated_by: spec/tools/build_rendering.py
+source: spec/rules/rulebook.v0.yaml
+findings:
+- id: A1
+  name: injection-pattern
+  agent: A
+  included: true
+  state:
+    kind: stateless
+    key:
+    - REQUEST_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.GatewayObservation.request_id
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-STREAMED-SPLIT
+  - field: microtrace.v0.GatewayObservation.path
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-STREAMED-SPLIT
+  - field: microtrace.v0.GatewayObservation.matches
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-STREAMED-SPLIT
+  - field: microtrace.v0.PatternMatch.pattern_id
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-STREAMED-SPLIT
+  - field: microtrace.v0.PatternMatch.location
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-STREAMED-SPLIT
+  - field: microtrace.v0.GatewayObservation.body_truncated
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-OVERSIZE-SLOW-OBSERVER
+  - field: microtrace.v0.GatewayObservation.observer_loss
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-OVERSIZE-SLOW-OBSERVER
+  context_joins: []
+  parameters:
+  - P_A
+  abstain:
+  - Body pattern class requested but body_truncated or observer_loss set for the covering
+    chunks (path/query matches still emit).
+  negative_controls:
+  - Benign request containing the pattern's tokens inside a JSON string field that
+    the pattern set excludes.
+  renderer_notes: 'PatternMatch entries in GatewayObservation.matches are sensor-computed:
+    apply the frozen P_A pattern set to path, query, and observed body chunks; the
+    scenario never sets pattern_id directly. body_truncated and observer_loss are
+    sensor-observed flags driven by the simulated observability profile. PatternMatch.pattern_set_version
+    must equal the P_A artifact version for the run.'
+- id: A2
+  name: injection-success-indicator
+  agent: A
+  included: true
+  state:
+    kind: stateless
+    key:
+    - REQUEST_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.GatewayObservation.request_id
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-RESPONSE-INDICATOR
+  - field: microtrace.v0.GatewayObservation.response_status
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-RESPONSE-INDICATOR
+  - field: microtrace.v0.GatewayObservation.response_body_bytes
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-RESPONSE-INDICATOR
+  - field: microtrace.v0.GatewayObservation.response_indicators
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-RESPONSE-INDICATOR
+  - field: microtrace.v0.ResponseIndicator.indicator_id
+    source: gateway
+    family: null
+    extra_keys: null
+    record: gateway
+    derived: null
+    gap2:
+    - GW-RESPONSE-INDICATOR
+  context_joins: []
+  parameters:
+  - P_A
+  - I_A2
+  abstain:
+  - Response not observed (observer_loss) - emit A1 only.
+  negative_controls:
+  - Same pattern with a generic 4xx/5xx error page that is not a declared indicator.
+  renderer_notes: ResponseIndicator entries in GatewayObservation.response_indicators
+    are sensor-computed from the frozen I_A2 set; the scenario never sets indicator_id
+    directly. A2 requires the same request_id as A1; render both in one event. ResponseIndicator.indicator_set_version
+    must equal the I_A2 artifact version. If the observability profile drops the response,
+    emit only an A1 opportunity; the A2 opportunity becomes UNOBSERVABLE.
+- id: B1
+  name: resource-enumeration
+  agent: B
+  included: true
+  state:
+    kind: keyed
+    key:
+    - PRINCIPAL_KIND
+    - PRINCIPAL_ID
+    window: W_B1
+  inputs:
+  - field: microtrace.v0.AuditEvent.verb
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.ObjectRef.resource
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.ObjectRef.api_group
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.ObjectRef.namespace
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.AuditEvent.stage_timestamp
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.AuditDerived.principal
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  context_joins: []
+  parameters:
+  - S_B1
+  - W_B1
+  - Q_B1
+  - gamma_B1
+  - N_cold
+  abstain:
+  - Principal absent from the frozen baseline (reported as unbaselined, no finding)
+  - Selected feed lacks read events (AUD-PROVIDER-READS).
+  negative_controls:
+  - A controller or kubectl get all by the same principal within its baseline; a new
+    principal with no baseline.
+  renderer_notes: AuditDerived.principal is normalizer-computed from AuditEvent.user;
+    the scenario specifies the principal by identity, not by direct field assignment.
+    The per-principal baseline Q_B1 must be built from the rendered benign workload
+    before attack scenarios run; every authenticated principal in the generated world
+    must have a Q_B1 entry.
+- id: B2
+  name: auth-failure-burst
+  agent: B
+  included: true
+  state:
+    kind: keyed
+    key:
+    - OBSERVED_SOURCE
+    window: W_B2
+  inputs:
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditEvent.stage
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditEvent.source_ips
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditEvent.user_agent
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditEvent.request_received_timestamp
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditDerived.authentication_failed
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-FAILED-AUTHN
+  - field: microtrace.v0.AuditDerived.observed_source
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-FAILED-AUTHN
+  context_joins: []
+  parameters:
+  - W_B2
+  - N_B2
+  - gamma_B2
+  abstain:
+  - No 401 events in the selected feed (AUD-FAILED-AUTHN failed).
+  negative_controls:
+  - A burst of 403 authorization denials; expired-token retries by a single client
+    below N_B2.
+  renderer_notes: 'AuditDerived.authentication_failed and observed_source are normalizer-computed.
+    Generate at least N_B2+1 consecutive 401 responses from one source IP within W_B2
+    for a PRESENT opportunity. Negative control: generate a burst of 403 authorization
+    denials from the same source within W_B2; B2 must not fire.'
+- id: B3
+  name: request-rate-spike
+  agent: B
+  included: true
+  state:
+    kind: keyed
+    key:
+    - PRINCIPAL_KIND
+    - PRINCIPAL_ID
+    window: W_B3
+  inputs:
+  - field: microtrace.v0.AuditEvent.request_received_timestamp
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  - field: microtrace.v0.AuditDerived.principal
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  context_joins: []
+  parameters:
+  - W_B3
+  - Q_B3
+  - gamma_B3
+  - N_cold
+  abstain:
+  - Principal not in baseline.
+  negative_controls:
+  - Scheduled benign batch job within its baseline.
+  renderer_notes: AuditDerived.principal is normalizer-computed. The per-principal
+    request-rate baseline Q_B3 must be consistent with the benign request volume the
+    generator renders; if a benign scenario sends above Q_B3, either raise the baseline
+    or add an ABSENT opportunity for the benign lookalike.
+- id: C1a
+  name: escape-indicators
+  agent: C
+  included: true
+  state:
+    kind: stateless
+    key:
+    - LINEAGE_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.NamespaceDetail.op
+    source: ebpf
+    family: ns.change
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-NS-TRANSITION
+    any_of: escape-primitive
+  - field: microtrace.v0.NamespaceDetail.clone_flags
+    source: ebpf
+    family: ns.change
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-NS-TRANSITION
+    any_of: escape-primitive
+  - field: microtrace.v0.PrivilegeDetail.after
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+    any_of: escape-primitive
+  - field: microtrace.v0.Endpoint.unix_path
+    source: ebpf
+    family: ipc.runtime_socket
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-NS-TRANSITION
+    any_of: escape-primitive
+  - field: microtrace.v0.BpfDetail.cmd
+    source: ebpf
+    family: bpf.call
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-BPF-SELF-EXCLUSION
+    any_of: escape-primitive
+  - field: microtrace.v0.BpfDetail.caller_is_sensor
+    source: ebpf
+    family: bpf.call
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-BPF-SELF-EXCLUSION
+    any_of: escape-primitive
+  - field: microtrace.v0.EbpfDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  context_joins:
+  - cgroup/container -> Pod UID (time-indexed)
+  parameters:
+  - Z_C
+  abstain:
+  - Pod attribution uncertain for the lineage.
+  negative_controls:
+  - The MicroTRACE sensor's own bpf() calls; container runtime's own setns during
+    container start (not Pod-attributed).
+  renderer_notes: EbpfDerived.pod_uid is normalizer-computed from cgroup/container
+    identity at event time; the scenario specifies the container, not the UID directly.
+    Z_C (declared runtime socket paths) is a declared artifact; connections to listed
+    paths qualify. For BpfDetail records, set caller_is_sensor=true only for the MicroTRACE
+    sensor process identity in the world model; those events are excluded.
+- id: C1b
+  name: observed-escape
+  agent: C
+  included: true
+  state:
+    kind: stateless
+    key:
+    - LINEAGE_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.NamespaceDetail.after
+    source: ebpf
+    family: ns.change
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-NS-TRANSITION
+    any_of: host-namespace-state
+  - field: microtrace.v0.NamespaceDetail.host_reference
+    source: ebpf
+    family: ns.sample
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-NS-TRANSITION
+    any_of: host-namespace-state
+  - field: microtrace.v0.EbpfDerived.host_namespace_after
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-NS-TRANSITION
+  - field: microtrace.v0.ExecDetail.executable
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-EXEC-LINEAGE
+  - field: microtrace.v0.RawEbpfRecord.lineage_root
+    source: ebpf
+    family: proc.fork
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-EXEC-LINEAGE
+  context_joins:
+  - lineage root -> Pod UID
+  parameters: []
+  abstain:
+  - Lineage gap (fork/exec events dropped) between the container process and the host-namespace
+    process.
+  negative_controls:
+  - A privileged DaemonSet that legitimately runs in host namespaces from start (declared,
+    no transition from a non-host lineage).
+  renderer_notes: 'EbpfDerived.host_namespace_after is sensor-computed: compare NamespaceDetail.after.mnt
+    and .pid to NamespaceDetail.host_reference (the node init namespace inodes recorded
+    at sensor start via NS_SAMPLE); set host_namespace_after=true only when both match.
+    The lineage_root -> Pod UID join requires a contiguous lineage chain in the context
+    history with no gaps.'
+- id: C2
+  name: ptrace-observed
+  agent: C
+  included: true
+  state:
+    kind: stateless
+    key:
+    - LINEAGE_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.PtraceDetail.request
+    source: ebpf
+    family: proc.ptrace
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PTRACE
+  - field: microtrace.v0.PtraceDetail.target
+    source: ebpf
+    family: proc.ptrace
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PTRACE
+  context_joins:
+  - cgroup/container -> Pod UID
+  parameters: []
+  abstain: []
+  negative_controls:
+  - Reading /proc/<pid>/status (no ptrace request).
+  renderer_notes: PtraceDetail.target is a ProcessKey; use a valid process identity
+    from the world model. The cgroup/container -> Pod UID join (EbpfDerived.pod_uid,
+    not a direct C2 input) must be consistent with the container lineage. Use PTRACE_ATTACH
+    (16) or PTRACE_SEIZE (16902) as the ptrace request constant.
+- id: D1
+  name: token-read-anomaly
+  agent: D
+  included: true
+  state:
+    kind: keyed
+    key:
+    - POD_UID
+    - VOLUME_NAME
+    window: null
+  inputs:
+  - field: microtrace.v0.FileAccessDetail.op
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.FileAccessDetail.bytes
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.FileIdentity.dev
+    source: ebpf
+    family: file.open
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-FILE-IDENTITY
+  - field: microtrace.v0.FileIdentity.ino
+    source: ebpf
+    family: file.open
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-FILE-IDENTITY
+  - field: microtrace.v0.FileIdentity.mnt_ns_inum
+    source: ebpf
+    family: file.open
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-FILE-IDENTITY
+  - field: microtrace.v0.FileIdentity.projected
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-ROTATION
+  - field: microtrace.v0.ProjectedVersion.owner_pod_uid
+    source: ebpf
+    family: token.file_index
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-FILE-IDENTITY
+  - field: microtrace.v0.ProjectedVersion.version_dir
+    source: ebpf
+    family: token.file_index
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-ROTATION
+  - field: microtrace.v0.RawEbpfRecord.reader_class
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-HOST-READER
+  - field: microtrace.v0.RawEbpfRecord.result
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.EbpfDerived.token_file
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-TOKEN-FILE-IDENTITY
+  - field: microtrace.v0.EbpfDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  context_joins:
+  - (dev, ino) -> projected token version via token.file_index
+  - reader cgroup -> Pod UID
+  - token owner Pod UID -> workload identity
+  parameters:
+  - E_D1
+  abstain:
+  - (dev, ino) not in the index
+  - Open without a successful read
+  - Reader cgroup unresolved (JOIN_UNCERTAIN)
+  - Token owner workload not in E_D1.
+  negative_controls:
+  - The workload's own client library reading its token (in E_D1)
+  - An open with O_RDONLY that is never read
+  - A file at the same path text in another mount namespace with different (dev, ino)
+  - kubelet writing a new version during rotation.
+  renderer_notes: EbpfDerived.token_file (a ProjectedVersion) is normalizer-computed
+    from FileIdentity.projected, which requires a prior ProjectedIndexEntry event
+    on family token.file_index to populate the node index; render the index event
+    before the file.read event. E_D1 is a declared expected-reader artifact; build
+    it from the benign workload before any D1 opportunity can be emitted. EbpfDerived.pod_uid
+    is normalizer-computed from the reader's cgroup identity.
+- id: D2
+  name: token-binding-mismatch
+  agent: D
+  included: false
+  reason: status conditional; AUD-POD-BINDING-EXTRA and CRED-CALLER-ATTRIBUTION Gap
+    2 tests not yet passed
+  state:
+    kind: stateless
+    key:
+    - JTI
+    window: null
+  inputs:
+  - field: microtrace.v0.AuditUser.extra
+    source: audit
+    family: null
+    extra_keys:
+    - authentication.kubernetes.io/pod-uid
+    - authentication.kubernetes.io/pod-name
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POD-BINDING-EXTRA
+  - field: microtrace.v0.AuditDerived.bound_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-POD-BINDING-EXTRA
+  - field: microtrace.v0.AuditDerived.attributed_caller_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - CRED-CALLER-ATTRIBUTION
+  - field: microtrace.v0.AuditDerived.peer_caller_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - CRED-CALLER-ATTRIBUTION
+  - field: microtrace.v0.AuditEvent.source_ips
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - CRED-CALLER-ATTRIBUTION
+  - field: microtrace.v0.SocketDetail.remote
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - CRED-CALLER-ATTRIBUTION
+  - field: microtrace.v0.AuditEvent.audit_id
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  context_joins:
+  - bound Pod UID -> Pod history
+  - caller Pod from an eBPF connection to the API server from the request's peer address
+    open at request time (conditional)
+  - caller Pod from the last source_ips entry -> time-indexed Pod IP history (conditional)
+  parameters:
+  - G_D2
+  abstain:
+  - Either caller route absent or ambiguous
+  - The two caller routes disagree
+  - Peer address is a node or host-network address (shared by every host-network process)
+  - No connection from the peer address covers the request time (e.g. opened before
+    the sensor and missing from the start-up socket snapshot)
+  - Token not Pod-bound (legacy Secret token or TokenRequest without a Pod binding).
+  negative_controls:
+  - Stay-in-X use of X's own token (D2 must not fire)
+  - A request whose only caller evidence is the unverified node-name claim
+  - A request with a forged X-Forwarded-For header naming another Pod (only the last
+    source_ips entry may be used)
+  - A request from a host-network Pod (D2 must abstain)
+  - An authorised component in Pod Z legitimately using a TokenRequest token bound
+    to X (D2 fires; labelled benign binding mismatch in ground truth).
+- id: E1
+  name: unsigned-image-admitted
+  agent: E
+  included: true
+  state:
+    kind: stateless
+    key:
+    - POD_UID
+    - CONTAINER_NAME
+    window: null
+  inputs:
+  - field: microtrace.v0.AdmissionDecision.verdict
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-POD-UID-DRYRUN
+  - field: microtrace.v0.AdmissionDecision.enforcement_audit_mode
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-POD-UID-DRYRUN
+  - field: microtrace.v0.AdmissionDecision.resource_uid
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-POD-UID-DRYRUN
+  - field: microtrace.v0.AdmissionDecision.dry_run
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-POD-UID-DRYRUN
+  - field: microtrace.v0.AdmissionDecision.image_digests
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-POD-UID-DRYRUN
+  - field: microtrace.v0.AdmissionDecision.admission_time
+    source: kyverno
+    family: null
+    extra_keys: null
+    record: kyverno
+    derived: null
+    gap2:
+    - KYV-ADMISSION-TIME
+  context_joins:
+  - resource_uid -> Pod history (created Pod exists)
+  parameters: []
+  abstain:
+  - dry_run true
+  - resource_uid never observed as an existing Pod (generateName retry) - evidence
+    gap.
+  negative_controls:
+  - Dry-run create
+  - A PASS verdict
+  - A blocking (enforce) policy that rejected the Pod.
+  renderer_notes: AdmissionDecision.enforcement_audit_mode must be true (audit-mode
+    policy). resource_uid must match an existing Pod UID in the context history; if
+    the observability profile does not export it, set a JOIN_UNCERTAIN completeness
+    gap and emit the finding with pod_uid_join_status=CONDITIONAL_JOIN_UNVALIDATED.
+    dry_run must be false; a dry_run=true admission must not produce an E1 opportunity.
+- id: E2
+  name: post-start-binary-write
+  agent: E
+  included: true
+  state:
+    kind: stateless
+    key:
+    - POD_UID
+    - CONTAINER_NAME
+    window: null
+  inputs:
+  - field: microtrace.v0.FileMutationDetail.op
+    source: ebpf
+    family: file.mutation
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-EXEC-WRITE-VARIANTS
+  - field: microtrace.v0.FileMutationDetail.file
+    source: ebpf
+    family: file.mutation
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-EXEC-WRITE-VARIANTS
+  - field: microtrace.v0.FileMutationDetail.executable_after
+    source: ebpf
+    family: file.mutation
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-EXEC-WRITE-VARIANTS
+  - field: microtrace.v0.EbpfDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  - field: microtrace.v0.EbpfDerived.container_name
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  - field: microtrace.v0.ContainerStatusSummary.started_at
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - CTX-RESTART-INDICATOR
+  context_joins:
+  - cgroup/container -> Pod UID and container name
+  - container start from context
+  parameters:
+  - E_E2
+  abstain:
+  - Write observed only through a shared mmap (content unknown) - JOIN_UNCERTAIN,
+    no finding.
+  negative_controls:
+  - Writes of non-executable data files
+  - Declared entrypoint setup writes in E_E2.
+  renderer_notes: EbpfDerived.pod_uid and container_name are normalizer-computed from
+    cgroup identity. ContainerStatusSummary.started_at comes from a context ObjectObservation
+    with a PodSummary; render that watch event before the mutation event time. E_E2
+    is a declared expected-writer artifact; build it from the world model before any
+    E2 opportunity can be emitted.
+- id: E3
+  name: persisted-implant
+  agent: E
+  included: false
+  reason: status conditional; E3-ARTIFACT-IDENTITY and E3-REEXEC-RESTART Gap 2 tests
+    not yet passed
+  state:
+    kind: keyed
+    key:
+    - POD_UID
+    - CONTAINER_NAME
+    window: W_E
+  inputs:
+  - field: microtrace.v0.FileMutationDetail.file
+    source: ebpf
+    family: file.mutation
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - E3-ARTIFACT-IDENTITY
+  - field: microtrace.v0.ExecDetail.executable
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - E3-REEXEC-RESTART
+  - field: microtrace.v0.ContainerRef.container_id
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - CTX-RESTART-INDICATOR
+  - field: microtrace.v0.ContainerStatusSummary.restart_count
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - CTX-RESTART-INDICATOR
+  - field: microtrace.v0.ContainerStatusSummary.container_id
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - CTX-RESTART-INDICATOR
+  - field: microtrace.v0.RawEbpfRecord.node_seq
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - KAFKA-RESTREAM-ORDER
+  context_joins:
+  - same Pod UID
+  - container name stable
+  - container ID changed or restart count increased
+  parameters:
+  - W_E
+  - G_E3
+  abstain:
+  - Artifact-identity method not demonstrated (always, until E3-ARTIFACT-IDENTITY
+    passes)
+  - Any dropped interval between write and exec.
+  negative_controls:
+  - Benign restart with no write
+  - A matching artifact in a concurrent replica (different Pod UID)
+  - A written file never executed after restart.
+- id: F1
+  name: capability-gain
+  agent: F
+  included: true
+  state:
+    kind: stateless
+    key:
+    - LINEAGE_ID
+    window: null
+  inputs:
+  - field: microtrace.v0.PrivilegeDetail.before
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+  - field: microtrace.v0.PrivilegeDetail.after
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+  - field: microtrace.v0.PrivilegeDetail.via_executable
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+  - field: microtrace.v0.Creds.euid
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+  - field: microtrace.v0.Creds.cap_effective
+    source: ebpf
+    family: priv.creds
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-PRIV-TRANSITION
+  context_joins:
+  - cgroup/container -> Pod UID
+  parameters:
+  - E_F1
+  abstain:
+  - Before-state unknown.
+  negative_controls:
+  - A declared setuid helper in E_F1
+  - Capability drop.
+  renderer_notes: PrivilegeDetail.before.euid and .after.euid, and .before.cap_effective
+    / .after.cap_effective, must be set accurately for the transition. E_F1 is a declared
+    expected-transitions artifact (e.g. declared setuid helpers); a transition in
+    E_F1 does not emit a F1 opportunity. Build E_F1 from the world model's declared
+    service processes before any attack scenario runs.
+- id: F2
+  name: RBAC-grant-mutation
+  agent: F
+  included: false
+  reason: status conditional; F2-HISTORICAL-RIGHTS and AUD-RBAC-BODY Gap 2 tests not
+    yet passed; unresolved Stage 3 evidence requirement
+  state:
+    kind: global
+    key:
+    - OBJECT_UID
+    window: null
+  inputs:
+  - field: microtrace.v0.AuditEvent.verb
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-RBAC-BODY
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-RBAC-BODY
+  - field: microtrace.v0.ObjectRef.uid
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - CTX-RBAC-RECREATE
+  - field: microtrace.v0.ObjectRef.resource_version
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-RBAC-BODY
+  - field: microtrace.v0.AuditEvent.request_object
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-RBAC-BODY
+    - AUD-TRUNCATION-OVERSIZE
+  - field: microtrace.v0.AuditEvent.response_object
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-RBAC-BODY
+    - AUD-TRUNCATION-OVERSIZE
+  - field: microtrace.v0.AuditUser.groups
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - F2-HISTORICAL-RIGHTS
+  - field: microtrace.v0.AuditEvent.impersonated_user
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - F2-HISTORICAL-RIGHTS
+  - field: microtrace.v0.RbacSummary.rules
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - F2-HISTORICAL-RIGHTS
+  - field: microtrace.v0.RbacSummary.subjects
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - F2-HISTORICAL-RIGHTS
+  - field: microtrace.v0.RbacSummary.aggregation_selectors
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - F2-HISTORICAL-RIGHTS
+  - field: microtrace.v0.ObjectObservation.watch_stream_seq
+    source: context
+    family: null
+    extra_keys: null
+    record: context
+    derived: null
+    gap2:
+    - CTX-WATCH-410
+  - field: microtrace.v0.WatchGap.reason
+    source: context
+    family: null
+    extra_keys: null
+    record: null
+    derived: null
+    gap2:
+    - CTX-WATCH-410
+  context_joins:
+  - replicated time-indexed RBAC history (UID, resourceVersion, watch stream order)
+  - external group membership source if any
+  parameters:
+  - G_F2
+  abstain:
+  - A WatchGap (410 Gone relist, disconnect) covers the interval between the last
+    complete state and the mutation, and no audit body fills it.
+  - Audit body stripped/truncated AND history cannot attribute the transition to this
+    audit action (object UID and resourceVersion in one watch stream).
+  - An externally authenticated group could change the before/after result and its
+    membership history is unavailable.
+  - Authorizer chain configuration for the cluster is unknown.
+  negative_controls:
+  - A second binding granting an already-held right
+  - Aggregation-controller reconciliation that adds no new right to the subject
+  - Binding to a subject in system:masters
+  - 'Delete-and-recreate with identical content: the delete does not fire, and the
+    recreate is attributed to the new binding UID, never matched to the deleted one.'
+- id: G1a
+  name: unbaselined-connection
+  agent: G
+  included: true
+  state:
+    kind: stateless
+    key:
+    - POD_UID
+    window: null
+  inputs:
+  - field: microtrace.v0.SocketDetail.remote
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.SocketDetail.flow
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.RawEbpfRecord.result
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.EbpfDerived.remote_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - CTX-POD-IP-REUSE
+  - field: microtrace.v0.EbpfDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  context_joins:
+  - remote IP -> Pod/Service at event time (interval-correct)
+  parameters:
+  - Q_G1a
+  - gamma_G1a
+  - W_G1a_ml
+  - N_cold
+  abstain:
+  - Remote IP ambiguous in the interval (JOIN_UNCERTAIN).
+  negative_controls:
+  - A baselined edge after Pod IP reuse by a different Pod.
+  renderer_notes: EbpfDerived.remote_pod_uid and pod_uid are normalizer-computed from
+    the socket remote address (time-indexed IP -> Pod) and cgroup identity respectively.
+    Q_G1a is the frozen service-edge baseline (versioned G baseline) as (source workload,
+    destination workload, port) triples; build from benign workload before attack
+    scenarios. After Pod IP reuse, the interval-correct join resolves to the new Pod;
+    a connect to a baselined workload on a reused IP does not trigger G1a.
+- id: G1c
+  name: unbaselined-inbound-connection
+  agent: G
+  included: true
+  state:
+    kind: stateless
+    key:
+    - POD_UID
+    window: null
+  inputs:
+  - field: microtrace.v0.SocketDetail.remote
+    source: ebpf
+    family: net.accept
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.SocketDetail.local
+    source: ebpf
+    family: net.accept
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.SocketDetail.flow
+    source: ebpf
+    family: net.accept
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.RawEbpfRecord.result
+    source: ebpf
+    family: net.accept
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.EbpfDerived.remote_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - CTX-POD-IP-REUSE
+  - field: microtrace.v0.EbpfDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  context_joins:
+  - peer IP -> Pod at event time (interval-correct)
+  parameters:
+  - Q_G1a
+  abstain:
+  - Peer IP ambiguous in the interval (JOIN_UNCERTAIN).
+  negative_controls:
+  - A baselined edge after Pod IP reuse by a different Pod.
+  renderer_notes: ''
+- id: G1b
+  name: token-pivot
+  agent: G
+  included: false
+  reason: status conditional; CRED-JTI-VERSION-INDEX and G1B-TARGET-EFFECT Gap 2 tests
+    not yet passed
+  state:
+    kind: keyed
+    key:
+    - JTI
+    window: W_w
+  inputs:
+  - field: microtrace.v0.TokenFileVersion.jti
+    source: ebpf
+    family: token.jti_index
+    extra_keys: null
+    record: null
+    derived: null
+    gap2:
+    - CRED-JTI-VERSION-INDEX
+  - field: microtrace.v0.FileIdentity.projected
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-TOKEN-ROTATION
+  - field: microtrace.v0.AuditDerived.used_credential_id
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-FIELDS-USEDTOKEN
+  - field: microtrace.v0.AuditUser.extra
+    source: audit
+    family: null
+    extra_keys:
+    - authentication.kubernetes.io/credential-id
+    record: audit
+    derived: null
+    gap2:
+    - AUD-FIELDS-USEDTOKEN
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - G1B-TARGET-EFFECT
+  - field: microtrace.v0.ObjectRef.namespace
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - G1B-TARGET-EFFECT
+  context_joins:
+  - read (dev, ino, version_dir) -> JTI via token.jti_index
+  - JTI -> use events
+  - declared boundary set Bnd_G1b
+  parameters:
+  - Bnd_G1b
+  - G_G1b
+  abstain:
+  - Until CRED-JTI-VERSION-INDEX and G1B-TARGET-EFFECT pass
+  - Effect is an exec already represented by G2.
+  negative_controls:
+  - Two tokens for one ServiceAccount (must not join)
+  - Stay-in-X use (positive attack case for recall, not a negative).
+- id: G2
+  name: exec-into-container
+  agent: G
+  included: false
+  reason: G2-TARGET-PROCESS-JOIN not yet passed; unresolved Stage 3 evidence requirement
+  state:
+    kind: keyed
+    key:
+    - POD_UID
+    window: W_G2
+  inputs:
+  - field: microtrace.v0.ObjectRef.subresource
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-EXEC-VERB
+  - field: microtrace.v0.AuditEvent.verb
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-EXEC-VERB
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-EXEC-VERB
+  - field: microtrace.v0.AuditEvent.request_uri
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - G2-TARGET-PROCESS-JOIN
+  - field: microtrace.v0.AuditDerived.resolved_target_pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - G2-TARGET-PROCESS-JOIN
+  - field: microtrace.v0.ExecDetail.starts_new_lineage
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - G2-TARGET-PROCESS-JOIN
+  - field: microtrace.v0.ExecDetail.argv_sha256
+    source: ebpf
+    family: proc.exec
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - G2-TARGET-PROCESS-JOIN
+  context_joins:
+  - namespace/name -> Pod UID at request time
+  - container name from request_uri
+  parameters:
+  - W_G2
+  abstain:
+  - Target Pod UID ambiguous
+  - No matching exec observed in W_G2 (sensor gap or not executed).
+  negative_controls:
+  - A denied exec (403)
+  - Container's own periodic probe exec (no audit request).
+- id: H1
+  name: egress-volume-anomaly
+  agent: H
+  included: true
+  state:
+    kind: keyed
+    key:
+    - POD_UID
+    window: W_H1
+  inputs:
+  - field: microtrace.v0.FlowCounter.bytes_out
+    source: ebpf
+    family: net.flow_bytes
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FLOW-COUNTERS
+  - field: microtrace.v0.FlowCounter.remote
+    source: ebpf
+    family: net.flow_bytes
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FLOW-COUNTERS
+  - field: microtrace.v0.EbpfDerived.remote_class
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - CTX-POD-IP-REUSE
+  context_joins:
+  - flow owner -> Pod UID -> workload
+  parameters:
+  - W_H1
+  - Q_H1
+  - gamma_H1
+  - N_cold
+  abstain:
+  - Counter interval overlaps a sensor loss interval.
+  negative_controls:
+  - Scheduled backup within baseline.
+  renderer_notes: EbpfDerived.remote_class is normalizer-computed; H1 counts only
+    external destinations. Q_H1 is the per-workload egress percentile baseline (versioned
+    H baseline); build from benign egress before attack scenarios. FlowCounter records
+    are counter-mode aggregates; render at interval boundaries declared in the capture
+    manifest. A sensor loss interval overlapping the counter window causes abstention.
+- id: H2
+  name: unseen-destination
+  agent: H
+  included: true
+  state:
+    kind: stateless
+    key:
+    - POD_UID
+    window: null
+  inputs:
+  - field: microtrace.v0.SocketDetail.remote
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.EbpfDerived.remote_class
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-SOCKET-FLOW
+  context_joins:
+  - flow owner -> Pod UID -> workload
+  parameters:
+  - Q_H2
+  abstain: []
+  negative_controls:
+  - Known destination at a new IP of the same declared range, if the set declares
+    ranges.
+  renderer_notes: EbpfDerived.remote_class is normalizer-computed. Q_H2 is the per-workload
+    external destination set (versioned H baseline); any (IP, port) absent from Q_H2
+    triggers H2. Build Q_H2 from benign outbound connects before attack scenarios.
+    H2 fires on the connect attempt; no flow bytes are required.
+- id: H3
+  name: bulk-secret-enumeration
+  agent: H
+  included: true
+  state:
+    kind: keyed
+    key:
+    - PRINCIPAL_KIND
+    - PRINCIPAL_ID
+    window: W_H3
+  inputs:
+  - field: microtrace.v0.AuditEvent.verb
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.ObjectRef.resource
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.ObjectRef.namespace
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.ObjectRef.name
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.AuditEvent.response_code
+    source: audit
+    family: null
+    extra_keys: null
+    record: audit
+    derived: null
+    gap2:
+    - AUD-PROVIDER-READS
+  - field: microtrace.v0.AuditDerived.principal
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: audit_derived
+    gap2:
+    - AUD-POLICY-EFFECTIVE
+  context_joins: []
+  parameters:
+  - W_H3
+  - N_H3
+  abstain:
+  - Read events absent from the selected feed.
+  negative_controls:
+  - A controller's periodic list of one namespace below N_H3.
+  renderer_notes: AuditDerived.principal is normalizer-computed. Generate at least
+    N_H3+1 qualifying secret list/get/watch events within W_H3 for a PRESENT opportunity.
+    At Metadata level a list returns no individual secret names; count it as one request
+    per namespace scope, not per secret.
+- id: H4
+  name: suspected-exfiltration
+  agent: H
+  included: true
+  state:
+    kind: keyed
+    key:
+    - POD_UID
+    - LINEAGE_ID
+    window: W_H
+  inputs:
+  - field: microtrace.v0.FileIdentity.ino
+    source: ebpf
+    family: file.open
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.FileAccessDetail.bytes
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.EbpfDerived.data_class
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-FILE-READ-SUCCESS
+  - field: microtrace.v0.SocketDetail.remote
+    source: ebpf
+    family: net.connect
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-SOCKET-FLOW
+  - field: microtrace.v0.FlowCounter.bytes_out
+    source: ebpf
+    family: net.flow_bytes
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - NODE-FLOW-COUNTERS
+  - field: microtrace.v0.EbpfDerived.lineage_id
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: ebpf_derived
+    gap2:
+    - NODE-EXEC-LINEAGE
+  - field: microtrace.v0.RawEbpfRecord.node_seq
+    source: ebpf
+    family: file.read
+    extra_keys: null
+    record: ebpf
+    derived: null
+    gap2:
+    - KAFKA-RESTREAM-ORDER
+  context_joins:
+  - file identity -> declared sensitive-data class C_H4
+  parameters:
+  - W_H
+  - C_H4
+  abstain:
+  - node_seq gap in the key's interval
+  - Read and transfer in different lineages (out of scope, counted as a miss).
+  negative_controls:
+  - Read in one lineage and send from another in the same Pod (must not fire)
+  - An ordinary outbound transfer with no preceding sensitive read.
+  renderer_notes: 'EbpfDerived.data_class is sensor-computed: match FileIdentity.ino
+    against the C_H4 declared sensitive-data class set; set data_class only for a
+    match. C_H4 must be consistent with the files the world model places in sensitive
+    paths (tokens, config secrets, declared sensitive volumes). EbpfDerived.lineage_id
+    is normalizer-computed from the lineage root. node_seq is the ordering authority;
+    ensure read and connect events in the same lineage have monotonically increasing
+    node_seq values on their node. The FlowCounter must be owned by the same process
+    lineage as the read event.'
+- id: H5
+  name: offnode-suspected-exfiltration
+  agent: H
+  included: false
+  reason: OFFNODE-DBAUDIT-SOURCE, OFFNODE-PATH-COVERAGE, and OFFNODE-FLOW-EXPORT unresolved
+    Stage 3 evidence requirements
+  state:
+    kind: keyed
+    key:
+    - SOURCE_ADDRESS
+    window: W_H5
+  inputs:
+  - field: microtrace.v0.DbAuditRecord.client
+    source: db-audit
+    family: null
+    extra_keys: null
+    record: db_audit
+    derived: null
+    gap2:
+    - OFFNODE-DBAUDIT-SOURCE
+  - field: microtrace.v0.DbAuditRecord.statement_class
+    source: db-audit
+    family: null
+    extra_keys: null
+    record: db_audit
+    derived: null
+    gap2:
+    - OFFNODE-DBAUDIT-SOURCE
+  - field: microtrace.v0.DbAuditRecord.succeeded
+    source: db-audit
+    family: null
+    extra_keys: null
+    record: db_audit
+    derived: null
+    gap2:
+    - OFFNODE-DBAUDIT-SOURCE
+  - field: microtrace.v0.DbAuditRecord.bytes_returned
+    source: db-audit
+    family: null
+    extra_keys: null
+    record: db_audit
+    derived: null
+    gap2:
+    - OFFNODE-DBAUDIT-SOURCE
+  - field: microtrace.v0.DbAuditRecord.server_time
+    source: db-audit
+    family: null
+    extra_keys: null
+    record: db_audit
+    derived: null
+    gap2:
+    - OFFNODE-DBAUDIT-SOURCE
+  - field: microtrace.v0.PathFlowRecord.src
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-PATH-COVERAGE
+  - field: microtrace.v0.PathFlowRecord.dst
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-PATH-COVERAGE
+  - field: microtrace.v0.PathFlowRecord.octets
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-FLOW-EXPORT
+  - field: microtrace.v0.PathFlowRecord.flow_start
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-FLOW-EXPORT
+  - field: microtrace.v0.PathFlowRecord.flow_end
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-FLOW-EXPORT
+  - field: microtrace.v0.PathFlowRecord.sampled
+    source: path-flow
+    family: null
+    extra_keys: null
+    record: path_flow
+    derived: null
+    gap2:
+    - OFFNODE-FLOW-EXPORT
+  - field: microtrace.v0.OffNodeDerived.source_address_class
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: offnode_derived
+    gap2:
+    - CTX-POD-IP-REUSE
+    - OFFNODE-HOST-SIGNATURES
+  - field: microtrace.v0.OffNodeDerived.pod_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: offnode_derived
+    gap2:
+    - CTX-POD-IP-REUSE
+  - field: microtrace.v0.OffNodeDerived.node_uid
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: offnode_derived
+    gap2:
+    - OFFNODE-HOST-SIGNATURES
+  - field: microtrace.v0.OffNodeDerived.remote_class
+    source: normalizer
+    family: null
+    extra_keys: null
+    record: null
+    derived: offnode_derived
+    gap2:
+    - OFFNODE-PATH-COVERAGE
+  context_joins:
+  - source address -> Pod UID or node host context (time-indexed address map)
+  - destination -> external
+  parameters:
+  - W_H5
+  - rho_H5
+  abstain:
+  - Source address AMBIGUOUS (overlapping holders or masquerade)
+  - bytes_returned not logged by the engine
+  - Sampled flow records
+  - Flow matches a declared host-component signature
+  - Path-observer export gap overlapping the window.
+  negative_controls:
+  - Benign database read and egress from a Pod on the same node below rho_H5 or outside
+    W_H5
+  - Kubelet image pull from the node's host context
+  - Egress of a declared hostNetwork Pod.

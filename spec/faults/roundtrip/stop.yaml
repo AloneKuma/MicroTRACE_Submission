@@ -1,0 +1,13 @@
+# Roundtrip fault plan: node stop (eBPF sensor stops at t=45 min)
+# Stage: source — from the first eBPF record with event_time >= 2024-01-01T00:45:00Z
+# the node sends nothing more.  Gateway, audit, and other sources continue.
+# Expected reconcile: eBPF records after the stop time are unreported drops
+# (source stage, no gap record); everything else is received.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: node-sensor-stop
+    kind: stop
+    stage: source
+    after: "2024-01-01T00:45:00Z"
+    select: {sources: [EBPF]}

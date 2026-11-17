@@ -1,0 +1,53 @@
+// MicroTRACE Gap 1 schema v0: external gRPC observer records (raw.gateway.v0).
+// Body bytes stay in protected evidence; only pattern matches and flags are
+// exported here.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "microtrace/v0/common.proto";
+
+enum MatchLocation {
+  MATCH_LOCATION_UNSPECIFIED = 0;
+  PATH = 1;
+  QUERY = 2;
+  REQUEST_BODY = 3;
+}
+
+message PatternMatch {
+  string pattern_id = 1;
+  string pattern_set_version = 2;
+  MatchLocation location = 3;
+  uint32 chunk_index = 4;
+  // True when the match spans a chunk boundary within the declared lookback.
+  bool spans_chunk_boundary = 5;
+}
+
+message ResponseIndicator {
+  string indicator_id = 1;
+  string indicator_set_version = 2;
+}
+
+message GatewayObservation {
+  // Envoy x-request-id. Who set it is recorded in request_id_origin.
+  string request_id = 1;
+  string route = 2;
+  string method = 3;
+  string authority = 4;
+  string path = 5;
+  string peer_ip = 6;
+  int32 response_status = 7;
+  uint64 response_body_bytes = 8;
+  repeated PatternMatch matches = 9;
+  repeated ResponseIndicator response_indicators = 10;
+  bool body_truncated = 11;
+  // Observer disconnected or lagged during this stream.
+  bool observer_loss = 12;
+  uint32 chunk_lookback_bytes = 13;
+  repeated EvidenceRef body_chunks = 14;
+  string gateway_build = 15;
+  // SENSOR only when the pinned gateway configuration replaces every
+  // client-supplied x-request-id and GW-REQUEST-ID-ORIGIN has passed for it;
+  // otherwise WORKLOAD (Envoy keeps a client's ID on non-edge requests).
+  KeyOrigin request_id_origin = 16;
+}

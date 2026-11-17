@@ -1,0 +1,20 @@
+# Roundtrip fault plan: suppress (targeted contradiction suppression)
+# Stage: transit — drops a predeclared set of logical_ids (placeholder IDs;
+# real IDs are substituted by the roundtrip script after building the run).
+# Expected reconcile: the named records are in the transit fault log and absent
+# from the archive; the archive has a DROPPED_BEFORE gap record.
+#
+# NOTE: logical_ids below are placeholders.  dataset-roundtrip.sh writes a
+# filled copy to $MT_DEV/roundtrip/suppress.yaml after building the run: two
+# evidence_event_ids of PRESENT finding opportunities that are in the replayed
+# shipper file.  This file stays the template.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: suppress-contradiction
+    kind: suppress
+    stage: transit
+    select:
+      logical_ids:
+        - "__PLACEHOLDER_SUPPRESS_ID_1__"
+        - "__PLACEHOLDER_SUPPRESS_ID_2__"

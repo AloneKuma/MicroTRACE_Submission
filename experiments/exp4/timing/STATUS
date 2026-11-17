@@ -1,0 +1,114 @@
+2026-11-16T08:00:20Z START mode aws, 32 cpu, code 1347da0, passes /home/ubuntu/code/experiments/exp4/passes.aws.tsv (783fd3393326), configs f35817f9263f, workloads fe2963ab74a4, caps d79fc898b1f1, commands c174cf9f5b21, params 5768b19e57d8, repeats 3, clock 2026-11-16T07:54:47Z ptp0='ena-ptp-00' Reference ID : 50484330 (PHC0) System time : 0.000000035 seconds slow of NTP time
+2026-11-16T08:00:21Z SEAL ok: truth not readable here (AccessDenied)
+OK 328 runs match /home/ubuntu/code/experiments/heldout/manifests/held_out.tsv
+2026-11-16T08:14:01Z DATA held_out 328 runs, findings go_main 328 runs
+2026-11-16T08:14:03Z PLAN 52 steps; rotation {"rep1": ["full_m1", "noindex_m1", "unbounded_m1", "reduced_k_m1", "reduced_l_m1", "reduced_t_m1", "full_m2", "noindex_m2", "full_m4", "noindex_m4", "full_m8", "noindex_m8"], "rep2": ["reduced_l_m1", "reduced_t_m1", "full_m2", "noindex_m2", "full_m4", "noindex_m4", "full_m8", "noindex_m8", "full_m1", "noindex_m1", "unbounded_m1", "reduced_k_m1"], "rep3": ["full_m4", "noindex_m4", "full_m8", "noindex_m8", "full_m1", "noindex_m1", "unbounded_m1", "reduced_k_m1", "reduced_l_m1", "reduced_t_m1", "full_m2", "noindex_m2"]}
+2026-11-16T08:14:03Z CACHE start (16 workers)
+2026-11-16T08:25:39Z CACHE done 42G
+2026-11-16T08:25:39Z RUN prep.orthrus: orthrus orthrus on - (prep, timed False, cap 21600.0s)
+2026-11-16T12:53:40Z DONE prep.orthrus exit 0 in 16081.8s
+2026-11-16T12:53:43Z RUN accuracy.ref_m1: go exhaustive on m1 (replay, timed False, cap 600.0s)
+2026-11-16T12:55:37Z DONE accuracy.ref_m1 exit 0 in 114.6s
+2026-11-16T12:55:43Z RUN accuracy.full_m1: go full on m1 (replay, timed False, cap 600.0s)
+2026-11-16T12:58:21Z DONE accuracy.full_m1 exit 0 in 157.9s
+2026-11-16T12:58:27Z RUN accuracy.noindex_m1: go no_index on m1 (replay, timed False, cap 600.0s)
+2026-11-16T13:00:07Z DONE accuracy.noindex_m1 exit 0 in 99.7s
+2026-11-16T13:00:13Z RUN accuracy.unbounded_m1: go unbounded on m1 (replay, timed False, cap 600.0s)
+2026-11-16T13:01:53Z DONE accuracy.unbounded_m1 exit 0 in 99.8s
+2026-11-16T13:01:59Z RUN accuracy.reduced_k_m1: go reduced_k on m1 (replay, timed False, cap 600.0s)
+2026-11-16T13:03:39Z DONE accuracy.reduced_k_m1 exit 0 in 99.9s
+2026-11-16T13:03:46Z RUN accuracy.reduced_l_m1: go reduced_l on m1 (replay, timed False, cap 600.0s)
+2026-11-16T13:05:26Z DONE accuracy.reduced_l_m1 exit 0 in 99.8s
+2026-11-16T13:05:34Z RUN accuracy.reduced_t_m1: go reduced_t on m1 (replay, timed False, cap 600.0s)
+2026-11-16T13:07:14Z DONE accuracy.reduced_t_m1 exit 0 in 99.8s
+2026-11-16T13:07:23Z RUN accuracy.full_m2: go full on m2 (replay, timed False, cap 600.0s)
+2026-11-16T13:09:07Z DONE accuracy.full_m2 exit 0 in 104.0s
+2026-11-16T13:09:14Z RUN accuracy.noindex_m2: go no_index on m2 (replay, timed False, cap 600.0s)
+2026-11-16T13:10:58Z DONE accuracy.noindex_m2 exit 0 in 104.1s
+2026-11-16T13:11:05Z RUN accuracy.full_m4: go full on m4 (replay, timed False, cap 600.0s)
+2026-11-16T13:12:56Z DONE accuracy.full_m4 exit 0 in 110.5s
+2026-11-16T13:13:03Z RUN accuracy.noindex_m4: go no_index on m4 (replay, timed False, cap 600.0s)
+2026-11-16T13:14:53Z DONE accuracy.noindex_m4 exit 0 in 110.6s
+2026-11-16T13:15:00Z RUN accuracy.full_m8: go full on m8 (replay, timed False, cap 600.0s)
+2026-11-16T13:17:34Z DONE accuracy.full_m8 exit 0 in 153.8s
+2026-11-16T13:17:40Z RUN accuracy.noindex_m8: go no_index on m8 (replay, timed False, cap 600.0s)
+2026-11-16T13:20:14Z DONE accuracy.noindex_m8 exit 0 in 153.7s
+2026-11-16T13:20:20Z RUN accuracy.orthrus.train: orthrus orthrus on - (train, timed True, cap 4320.0s)
+2026-11-16T13:58:31Z DONE accuracy.orthrus.train exit 0 in 2290.1s
+2026-11-16T13:58:37Z RUN accuracy.orthrus: orthrus orthrus on - (detect, timed False, cap 600.0s)
+2026-11-16T13:58:37Z DONE accuracy.orthrus exit 0 in 0.3s
+2026-11-16T13:58:43Z RUN rep1.full_m1: go full on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:00:23Z DONE rep1.full_m1 exit 0 in 99.9s
+2026-11-16T14:00:33Z RUN rep1.noindex_m1: go no_index on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:02:13Z DONE rep1.noindex_m1 exit 0 in 100.4s
+2026-11-16T14:02:21Z RUN rep1.unbounded_m1: go unbounded on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:04:01Z DONE rep1.unbounded_m1 exit 0 in 100.2s
+2026-11-16T14:04:11Z RUN rep1.reduced_k_m1: go reduced_k on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:05:52Z DONE rep1.reduced_k_m1 exit 0 in 100.3s
+2026-11-16T14:06:02Z RUN rep1.reduced_l_m1: go reduced_l on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:07:42Z DONE rep1.reduced_l_m1 exit 0 in 100.4s
+2026-11-16T14:07:53Z RUN rep1.reduced_t_m1: go reduced_t on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:09:33Z DONE rep1.reduced_t_m1 exit 0 in 100.4s
+2026-11-16T14:09:44Z RUN rep1.full_m2: go full on m2 (replay, timed True, cap 600.0s)
+2026-11-16T14:11:29Z DONE rep1.full_m2 exit 0 in 104.3s
+2026-11-16T14:11:38Z RUN rep1.noindex_m2: go no_index on m2 (replay, timed True, cap 600.0s)
+2026-11-16T14:13:23Z DONE rep1.noindex_m2 exit 0 in 104.3s
+2026-11-16T14:13:33Z RUN rep1.full_m4: go full on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:15:24Z DONE rep1.full_m4 exit 0 in 111.0s
+2026-11-16T14:15:33Z RUN rep1.noindex_m4: go no_index on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:17:24Z DONE rep1.noindex_m4 exit 0 in 111.2s
+2026-11-16T14:17:33Z RUN rep1.full_m8: go full on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:20:08Z DONE rep1.full_m8 exit 0 in 154.6s
+2026-11-16T14:20:17Z RUN rep1.noindex_m8: go no_index on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:22:50Z DONE rep1.noindex_m8 exit 0 in 153.6s
+2026-11-16T14:22:59Z RUN rep2.reduced_l_m1: go reduced_l on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:24:40Z DONE rep2.reduced_l_m1 exit 0 in 100.4s
+2026-11-16T14:24:52Z RUN rep2.reduced_t_m1: go reduced_t on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:26:32Z DONE rep2.reduced_t_m1 exit 0 in 100.5s
+2026-11-16T14:26:44Z RUN rep2.full_m2: go full on m2 (replay, timed True, cap 600.0s)
+2026-11-16T14:28:29Z DONE rep2.full_m2 exit 0 in 104.4s
+2026-11-16T14:28:40Z RUN rep2.noindex_m2: go no_index on m2 (replay, timed True, cap 600.0s)
+2026-11-16T14:30:25Z DONE rep2.noindex_m2 exit 0 in 104.9s
+2026-11-16T14:30:36Z RUN rep2.full_m4: go full on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:32:27Z DONE rep2.full_m4 exit 0 in 111.1s
+2026-11-16T14:32:37Z RUN rep2.noindex_m4: go no_index on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:34:28Z DONE rep2.noindex_m4 exit 0 in 111.1s
+2026-11-16T14:34:39Z RUN rep2.full_m8: go full on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:37:12Z DONE rep2.full_m8 exit 0 in 153.2s
+2026-11-16T14:37:22Z RUN rep2.noindex_m8: go no_index on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:39:56Z DONE rep2.noindex_m8 exit 0 in 154.0s
+2026-11-16T14:40:06Z RUN rep2.full_m1: go full on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:41:47Z DONE rep2.full_m1 exit 0 in 100.3s
+2026-11-16T14:41:59Z RUN rep2.noindex_m1: go no_index on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:43:40Z DONE rep2.noindex_m1 exit 0 in 100.4s
+2026-11-16T14:43:53Z RUN rep2.unbounded_m1: go unbounded on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:45:34Z DONE rep2.unbounded_m1 exit 0 in 100.4s
+2026-11-16T14:45:48Z RUN rep2.reduced_k_m1: go reduced_k on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:47:28Z DONE rep2.reduced_k_m1 exit 0 in 100.7s
+2026-11-16T14:47:40Z RUN rep3.full_m4: go full on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:49:31Z DONE rep3.full_m4 exit 0 in 110.6s
+2026-11-16T14:49:43Z RUN rep3.noindex_m4: go no_index on m4 (replay, timed True, cap 600.0s)
+2026-11-16T14:51:34Z DONE rep3.noindex_m4 exit 0 in 111.1s
+2026-11-16T14:51:47Z RUN rep3.full_m8: go full on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:54:21Z DONE rep3.full_m8 exit 0 in 154.3s
+2026-11-16T14:54:33Z RUN rep3.noindex_m8: go no_index on m8 (replay, timed True, cap 600.0s)
+2026-11-16T14:57:07Z DONE rep3.noindex_m8 exit 0 in 154.0s
+2026-11-16T14:57:20Z RUN rep3.full_m1: go full on m1 (replay, timed True, cap 600.0s)
+2026-11-16T14:59:00Z DONE rep3.full_m1 exit 0 in 100.6s
+2026-11-16T14:59:15Z RUN rep3.noindex_m1: go no_index on m1 (replay, timed True, cap 600.0s)
+2026-11-16T15:00:56Z DONE rep3.noindex_m1 exit 0 in 100.5s
+2026-11-16T15:01:12Z RUN rep3.unbounded_m1: go unbounded on m1 (replay, timed True, cap 600.0s)
+2026-11-16T15:02:52Z DONE rep3.unbounded_m1 exit 0 in 100.6s
+2026-11-16T15:03:06Z RUN rep3.reduced_k_m1: go reduced_k on m1 (replay, timed True, cap 600.0s)
+2026-11-16T15:04:47Z DONE rep3.reduced_k_m1 exit 0 in 100.8s
+2026-11-16T15:05:03Z RUN rep3.reduced_l_m1: go reduced_l on m1 (replay, timed True, cap 600.0s)
+2026-11-16T15:06:44Z DONE rep3.reduced_l_m1 exit 0 in 100.7s
+2026-11-16T15:06:59Z RUN rep3.reduced_t_m1: go reduced_t on m1 (replay, timed True, cap 600.0s)
+2026-11-16T15:08:40Z DONE rep3.reduced_t_m1 exit 0 in 100.6s
+2026-11-16T15:08:58Z RUN rep3.full_m2: go full on m2 (replay, timed True, cap 600.0s)
+2026-11-16T15:10:42Z DONE rep3.full_m2 exit 0 in 104.5s
+2026-11-16T15:10:58Z RUN rep3.noindex_m2: go no_index on m2 (replay, timed True, cap 600.0s)
+2026-11-16T15:12:43Z DONE rep3.noindex_m2 exit 0 in 104.8s
+2026-11-16T15:13:12Z SCORED exp4_summary.tsv
+2026-11-16T15:13:12Z ALL_DONE
+2026-11-16T15:13:26Z SHUTDOWN after final copy

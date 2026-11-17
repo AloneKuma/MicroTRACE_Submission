@@ -1,0 +1,13 @@
+config	workload	status	units	feasible_units	capped_units	failed_units	path_recall	reference_paths	retained	links_equal_no_index	links_compared_no_index	links_equal_reference	links_compared_reference	repeats	repeat_units_equal	repeat_units_compared	archive_equal_units	archive_checked_units	median_pass_wall_s	median_sum_unit_cpu_s	median_max_unit_rss_mb	median_go_seconds	median_throughput_findings_per_s	median_go_ms_per_finding	median_pairs_tested
+exhaustive	m1	ok	8	8	0	0	1.0	31	31	8	8	8	8	0	0	0	0	0	-	-	-	-	-	-	-
+exhaustive	m2	ok	4	4	0	0	1.0	31	31	4	4	4	4	0	0	0	0	0	-	-	-	-	-	-	-
+full	m1	ok	8	8	0	0	1.0	31	31	8	8	8	8	3	24	24	8	8	9.462	18.18	1202.1	7.822779	7.542	132.589475	608
+full	m2	ok	4	4	0	0	1.0	31	31	4	4	4	4	3	12	12	0	0	9.709	18.81	2194.1	8.922745	6.612	151.232966	608
+full	m4	ok	2	0	0	0	-	0	0	2	2	0	0	3	6	6	0	0	11.092	20.08	3612.0	9.833138	6.0	166.663356	608
+no_index	m1	ok	8	8	0	0	1.0	31	31	0	0	8	8	3	24	24	0	0	9.384	17.97	1202.1	7.672714	7.69	130.046	616
+no_index	m2	ok	4	4	0	0	1.0	31	31	0	0	4	4	3	12	12	0	0	9.893	19.11	2194.1	8.983884	6.567	152.26922	616
+no_index	m4	ok	2	0	0	0	-	0	0	0	0	0	0	3	6	6	0	0	16.432	18.57	3612.0	9.013017	6.546	152.763	616
+reduced_k	m1	ok	8	8	0	0	0.290323	31	9	8	8	8	8	3	24	24	0	0	9.434	17.96	1202.1	7.642715	7.72	129.537542	608
+reduced_l	m1	ok	8	8	0	0	0.935484	31	29	8	8	8	8	3	24	24	0	0	9.396	17.89	1202.1	7.677688	7.685	130.130305	608
+reduced_t	m1	ok	8	8	0	0	1.0	31	31	8	8	8	8	3	24	24	0	0	9.684	18.58	1202.2	8.266633	7.137	140.112424	608
+unbounded	m1	ok	8	8	0	0	1.0	31	31	8	8	8	8	3	24	24	0	0	9.399	17.89	1202.1	7.667309	7.695	129.95439	608

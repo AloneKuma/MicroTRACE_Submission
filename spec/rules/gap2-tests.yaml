@@ -1,0 +1,325 @@
+# Named Gap 2 tests referenced by the Gap 1 artifacts.
+#
+# Each test belongs to one row of the Stage 3 table in
+# section-iii-completion-plan.md. `status` stays not_run until an evidence
+# record supports a verdict (pass | narrowed | unsupported | inconclusive);
+# an observed status names its `evidence` record and `scope`. Where a test
+# covers several delivery routes, `routes` records each route and the overall
+# status stays not_run until every route the claim depends on has run.
+# Failure rules narrow or keep a capability conditional; they never
+# convert silence into a negative result.
+catalog_version: gap2-tests.v0
+tests:
+  # --- Audit and context -------------------------------------------------
+  - id: AUD-POLICY-EFFECTIVE
+    stage3_row: Audit and context
+    demonstrates: Effective policy or provider policy yields the required level and stages for every rulebook audit_requirements probe; spec/tools/check_gap1.py checks those requirements offline.
+    failure_rule: Mark each affected finding incomplete or unsupported on that cluster.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; managed-provider policies not observed
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-ORIGIN-FORGERY
+    stage3_row: Audit and context
+    demonstrates: A Pod sending impersonation, front-proxy, forwarding, user-agent and trace headers cannot change the sensor-originated audit user, token-bound Pod UID or credential ID; workload-asserted fields (sourceIPs[0], userAgent, traceparent, X-Request-Id) arrive as sent.
+    failure_rule: Any sensor-labelled field that a Pod can set is relabelled workload; witnesses that relied on it stay conditional.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver, run 20261002T081235Z; API-server identity and HTTP headers only; kernel 5-tuple and eBPF fields not run (NODE-ORIGIN-FORGERY)
+    evidence: evidence/cluster/forgery-probe-20261002T081235Z.md
+  - id: AUD-FIELDS-USEDTOKEN
+    stage3_row: Audit and context
+    demonstrates: A request with a projected token carries user.extra authentication.kubernetes.io/credential-id (JTI=...) through the actual export.
+    failure_rule: credential-read-to-use and G1b stay conditional; D2 unaffected.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; Pod-bound TokenRequest token used from the host, not a kubelet-projected file read in-Pod
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-ISSUED-ANNOTATION
+    stage3_row: Audit and context
+    demonstrates: A TokenRequest create carries annotation authentication.kubernetes.io/issued-credential-id at Metadata level without a response body.
+    failure_rule: Issuance-to-use join unavailable; record as unsupported.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-POD-BINDING-EXTRA
+    stage3_row: Audit and context
+    demonstrates: Pod-bound token use carries user.extra pod-uid/pod-name; node-name/node-uid are not relied on.
+    failure_rule: D2 unsupported on that cluster.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-FAILED-AUTHN
+    stage3_row: Audit and context
+    demonstrates: A request with an invalid bearer token yields a 401 audit event at ResponseStarted with empty user and a sourceIPs entry.
+    failure_rule: B2 unsupported or narrowed to what the event carries.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; source is the kind bridge peer
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-RBAC-BODY
+    stage3_row: Audit and context
+    demonstrates: RBAC create/update/patch/delete events carry request and response objects at RequestResponse.
+    failure_rule: F2 relies on watch history only, subject to CTX-WATCH-410.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-TRUNCATION-OVERSIZE
+    stage3_row: Audit and context
+    demonstrates: An oversized RBAC mutation through the real backend/export shows whether objects are stripped or the event dropped (including the EKS CloudWatch limit).
+    failure_rule: Set BODY_STRIPPED / DROPPED_BEFORE; F2 falls back to complete history or abstains.
+    status: not_run
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; file route only
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+    routes: {kube-apiserver-log-file: pass, eks-cloudwatch: not_run, gke-aks-export: not_run}
+  - id: AUD-PROVIDER-READS
+    stage3_row: Audit and context
+    demonstrates: get/list/watch events are present in the selected feed (GKE Data Access, AKS kube-audit vs kube-audit-admin).
+    failure_rule: B1 and H3 incomplete on that feed.
+    status: not_run
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; local get/list/watch baseline only
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+    routes: {self-managed-log-file-baseline: pass, gke-data-access: not_run, aks-kube-audit: not_run, eks-cloudwatch: not_run}
+  - id: AUD-EXEC-VERB
+    stage3_row: Audit and context
+    demonstrates: Recorded verb, subresource, stages, and response code for kubectl exec over WebSocket and SPDY on the pinned version.
+    failure_rule: Adjust G2 predicate to the observed shape; no G2 claim until observed.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; kubectl v1.35.8 WebSocket (verb get) and SPDY (verb create)
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-API-LATENCY
+    stage3_row: Audit and context
+    demonstrates: API latency under the chosen backend mode, measured separately from collector lag.
+    failure_rule: Report the latency cost; do not claim zero overhead.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; one small-sample comparison against a no-audit cluster, no overhead bound
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: AUD-LOSS-ROUTE
+    stage3_row: Audit and context
+    demonstrates: Collector detects rotation overrun, webhook overflow, export errors, and provider delivery gaps.
+    failure_rule: Intervals without established delivery are DELIVERY_UNKNOWN.
+    status: not_run
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; file route only
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+    routes: {log-file-rotation-tail: pass, log-file-stopped-reader: pass, webhook-batch-overflow: not_run, provider-export: not_run, export-error-counters: not_run}
+  - id: CTX-WATCH-410
+    stage3_row: Audit and context
+    demonstrates: A forced 410 Gone relist is recorded as a WatchGap and intermediate RBAC mutations are marked unknown.
+    failure_rule: Historical RBAC claims abstain over unrecorded gaps.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; 410 delivered as a watch ERROR event after watch-cache eviction
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: CTX-POD-IP-REUSE
+    stage3_row: Audit and context
+    demonstrates: IP-to-Pod resolution is interval-correct across Pod deletion and IP reuse.
+    failure_rule: Ambiguous intervals yield JOIN_UNCERTAIN.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z; kindnet on one worker; no overlapping interval occurred
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: CTX-RBAC-RECREATE
+    stage3_row: Audit and context
+    demonstrates: Delete-and-recreate of an RBAC object is distinguished by UID in history.
+    failure_rule: Name-only continuity is class-level; F2 abstains.
+    status: pass
+    scope: kind v0.33.0, Kubernetes v1.35.8, self-managed kube-apiserver JSON log backend (blocking), run 20260927T133846Z
+    evidence: evidence/cluster/audit-context-20260927T133846Z.md
+  - id: CTX-RESTART-INDICATOR
+    stage3_row: E3
+    demonstrates: Same-Pod container restart is visible as a changed container ID and/or increased restartCount, with its data source.
+    failure_rule: E3 stays conditional.
+    status: not_run
+
+  # --- Node export and load ---------------------------------------------
+  - id: NODE-EXEC-LINEAGE
+    stage3_row: Node export and load
+    demonstrates: exec/fork/exit give ProcessKey and lineage_root; an exec session starts a new lineage; PID reuse is disambiguated.
+    failure_rule: process-ancestry stays conditional; affected findings abstain.
+    status: not_run
+  - id: NODE-FILE-READ-SUCCESS
+    stage3_row: Node export and load
+    demonstrates: A successful read is distinguishable from an open or failed read, with fd-to-file identity.
+    failure_rule: D1 and H4 unsupported.
+    status: not_run
+  - id: NODE-TOKEN-FILE-IDENTITY
+    stage3_row: Credential
+    demonstrates: The token read yields (dev, ino) matching token.file_index in container and host mount namespaces, independent of path text.
+    failure_rule: D1 unsupported; path-only matching is not accepted.
+    status: not_run
+  - id: NODE-TOKEN-ROTATION
+    stage3_row: Credential
+    demonstrates: Reads of old and new token versions around a kubelet refresh map to distinct version directories.
+    failure_rule: D1 emitted without version; credential-read-to-use stays conditional.
+    status: not_run
+  - id: NODE-HOST-READER
+    stage3_row: Credential
+    demonstrates: A host process reading the token through the kubelet volume path is classified READER_HOST_PROCESS with no Pod attribution.
+    failure_rule: Host reads are an evidence gap; never attributed to the owning Pod.
+    status: not_run
+  - id: NODE-PRIV-TRANSITION
+    stage3_row: Node export and load
+    demonstrates: setuid-root and capability gains produce before/after creds.
+    failure_rule: F1 unsupported.
+    status: not_run
+  - id: NODE-NS-TRANSITION
+    stage3_row: Node export and load
+    demonstrates: setns/unshare/mount attempts and a host-namespace exec are captured with nsfs inodes and host reference.
+    failure_rule: C1b unsupported; C1a narrowed to observable calls.
+    status: not_run
+  - id: NODE-PTRACE
+    stage3_row: Node export and load
+    demonstrates: ptrace attach from a Pod process is captured with target.
+    failure_rule: C2 unsupported.
+    status: not_run
+  - id: NODE-BPF-SELF-EXCLUSION
+    stage3_row: Node export and load
+    demonstrates: The sensor's own bpf() calls are marked caller_is_sensor and excluded; a Pod's bpf() is not.
+    failure_rule: C1a drops bpf() as an indicator.
+    status: not_run
+  - id: NODE-EXEC-WRITE-VARIANTS
+    stage3_row: E3
+    demonstrates: chmod, create-with-mode, rename-over, fchmodat2, and mmap-write variants of making an executable are observed or flagged.
+    failure_rule: E2 narrowed to observed variants; gaps recorded.
+    status: not_run
+  - id: NODE-ORIGIN-FORGERY
+    stage3_row: Node export and load
+    demonstrates: On a native worker, a Pod cannot change the kernel-observed connect/accept 5-tuple, process lineage or Pod/container identity that the node sensor exports.
+    failure_rule: Any forgeable kernel field is relabelled workload; network-flow and process-ancestry stay conditional.
+    status: not_run
+  - id: NODE-SOCKET-FLOW
+    stage3_row: Node export and load
+    demonstrates: connect/accept carry FlowId and owning process; a connect/accept pair joins by 5-tuple and time.
+    failure_rule: network-flow witness stays conditional.
+    status: not_run
+  - id: NODE-FLOW-COUNTERS
+    stage3_row: Node export and load
+    demonstrates: Per-flow byte counters attribute to one owning process lineage.
+    failure_rule: H4 transfer half unsupported; H1 remains workload-level.
+    status: not_run
+  - id: NODE-LOSS-LOAD
+    stage3_row: Node export and load
+    demonstrates: Attempted/emitted/dropped counts per family under increasing load, with CPU/memory.
+    failure_rule: Report the throughput boundary; drops become gaps.
+    status: not_run
+  - id: NODE-CLOCK-MODEL
+    stage3_row: Node export and load
+    demonstrates: Monotonic-to-wall conversion and a measured per-node uncertainty bound.
+    failure_rule: Windows use the measured bound; unknown bound marks events uncertain.
+    status: not_run
+
+  # --- Kafka contract -----------------------------------------------------
+  - id: KAFKA-KEY-PARTITION
+    stage3_row: Kafka contract
+    demonstrates: Every producer client computes the same partition for the same key bytes (Java murmur2 / librdkafka murmur2_random).
+    failure_rule: Topic unusable for keyed state until the partitioner is pinned.
+    status: not_run
+  - id: KAFKA-RESTREAM-ORDER
+    stage3_row: Kafka contract
+    demonstrates: agent.H.lineage.v0 and agent.E.v0 receive all events of a key on one partition; agents order them by (node_id, boot_id, node_seq) across a normalizer rebalance.
+    failure_rule: H4/E3 abstain on keys with sequence gaps.
+    status: not_run
+  - id: KAFKA-REPLAY-DEDUP
+    stage3_row: Kafka contract
+    demonstrates: Replay appends duplicates that consumers drop by logical ID.
+    failure_rule: Replay results not comparable.
+    status: not_run
+  - id: KAFKA-SCHEMA-REJECT
+    stage3_row: Kafka contract
+    demonstrates: A consumer rejects an unsupported schema_major and accepts an added optional field.
+    failure_rule: Fix decoder before evaluation.
+    status: not_run
+  - id: KAFKA-RETENTION
+    stage3_row: Kafka contract
+    demonstrates: retention.bytes never evicts records younger than the declared time floor under load.
+    failure_rule: Raise capacity or shorten the declared replay span.
+    status: not_run
+  - id: KAFKA-HEARTBEAT
+    stage3_row: Kafka contract
+    demonstrates: Heartbeats reach every partition and advance the watermark of quiet partitions; max-idle excludes a stalled producer.
+    failure_rule: Watermark stalls are reported; incidents marked incomplete.
+    status: not_run
+
+  # --- Gateway / Kyverno --------------------------------------------------
+  - id: GW-STREAMED-SPLIT
+    stage3_row: Gateway
+    demonstrates: A pattern split across STREAMED chunks is matched within the declared lookback.
+    failure_rule: Body matches limited to within-chunk; misses counted.
+    status: not_run
+  - id: GW-OVERSIZE-SLOW-OBSERVER
+    stage3_row: Gateway
+    demonstrates: Oversized body, disconnected and slow observer set body_truncated/observer_loss without failing requests.
+    failure_rule: Limit A1/A2 to path/query.
+    status: not_run
+  - id: GW-RESPONSE-INDICATOR
+    stage3_row: Gateway
+    demonstrates: Response indicators for the declared pattern classes are observable (status, size).
+    failure_rule: A2 unsupported; A1 stands.
+    status: not_run
+  - id: GW-REQUEST-ID-ORIGIN
+    stage3_row: Gateway
+    demonstrates: Under the pinned gateway configuration, a client-supplied x-request-id (from a Pod and from an external client) is replaced by a gateway-generated ID before the observer and upstream see it; under Envoy defaults (negative control) the supplied ID survives.
+    failure_rule: request_id_origin stays WORKLOAD; request-identity only raises q_w and never confirms a link.
+    status: not_run
+  - id: KYV-POD-UID-DRYRUN
+    stage3_row: Kyverno
+    demonstrates: Exported resource_uid is the created Pod UID; dry-run and generateName retries are identifiable.
+    failure_rule: E1 carries image-class context only; admission-instance unavailable.
+    status: not_run
+  - id: KYV-ADMISSION-TIME
+    stage3_row: Kyverno
+    demonstrates: Admission time is exported or reliably joined, distinct from report time.
+    failure_rule: E1 event time marked uncertain.
+    status: not_run
+
+  # --- Credential, G1b/G2, E3, F2 ------------------------------------------
+  - id: CRED-JTI-VERSION-INDEX
+    stage3_row: Credential
+    demonstrates: token.jti_index maps each version to its JTI; two tokens for one ServiceAccount stay distinct (negative control).
+    failure_rule: credential-read-to-use and G1b remain conditional.
+    status: not_run
+  - id: CRED-CALLER-ATTRIBUTION
+    stage3_row: Credential
+    demonstrates: The caller Pod of an API request is placed by two routes that agree — an eBPF connection to the API server (service VIP and endpoint both recognised) from the request's peer address, open at request time, and the last source_ips entry resolved through the Pod IP history — never by client-supplied source_ips entries or unverified node claims. Cases covered include a long-lived HTTP/2 connection reused for many requests, a connection already open at sensor start (socket snapshot), a forged X-Forwarded-For header, a host-network caller (must abstain), and no masquerade between Pod and API server on the pinned CNI.
+    failure_rule: D2 abstains.
+    status: not_run
+  - id: G2-TARGET-PROCESS-JOIN
+    stage3_row: G2 and G1b effect
+    demonstrates: An accepted exec request joins to the resulting new-lineage exec in the target container; one action ID.
+    failure_rule: No G2 finding; the audit record remains evidence only.
+    status: not_run
+  - id: G1B-TARGET-EFFECT
+    stage3_row: G2 and G1b effect
+    demonstrates: A distinct authenticated effect at the declared boundary, for stay-in-X and moved-to-Y variants.
+    failure_rule: G1b conditional; stay-in-X misses count against recall.
+    status: not_run
+  - id: E3-ARTIFACT-IDENTITY
+    stage3_row: E3
+    demonstrates: A selected artifact-identity method links the written file to the executed file across a restart.
+    failure_rule: E3 stays conditional; E2 remains unmapped.
+    status: not_run
+  - id: E3-REEXEC-RESTART
+    stage3_row: E3
+    demonstrates: Observed re-execution after a same-Pod container restart through existing workload behavior; benign restart and replica controls do not fire.
+    failure_rule: E3 not exercised.
+    status: not_run
+  - id: F2-HISTORICAL-RIGHTS
+    stage3_row: Sole grant
+    demonstrates: Before/after effective rights with redundant grants, aggregation, wildcards, system:masters, external groups, webhook/Node authorizers, impersonation, stripped bodies, and 410 gaps.
+    failure_rule: F2 abstains in each failing case; sole-grant witness stays enabling.
+    status: not_run
+  # --- Off-node ------------------------------------------------------------
+  - id: OFFNODE-DBAUDIT-SOURCE
+    stage3_row: Off-node
+    demonstrates: The database audit log, collected off the source node, records statement class, success, result bytes and the client's own address (not a proxy's or a masqueraded node address) for a read from a Pod and from a node's host network.
+    failure_rule: H5 unsupported on that engine or route; host-context unavailable when the client address is not preserved.
+    status: not_run
+  - id: OFFNODE-PATH-COVERAGE
+    stage3_row: Off-node
+    demonstrates: Every node's egress, including hostNetwork and host-process traffic, traverses the off-node path observer with Pod source addresses preserved (no masquerade); no route bypasses it, and the escape-target node hosts no observer, database or transport.
+    failure_rule: H5 limited to the covered routes; a bypassing route is a declared miss, and host-context degrades to enabling context.
+    status: not_run
+  - id: OFFNODE-FLOW-EXPORT
+    stage3_row: Off-node
+    demonstrates: Flow records carry unsampled source-to-destination octets and start/end times; active/idle timeouts and export lag are measured, and W_H5 and the lateness allowance cover the active timeout.
+    failure_rule: Sampled or late flow records make H5 abstain; record the export boundary.
+    status: not_run
+  - id: OFFNODE-HOST-SIGNATURES
+    stage3_row: Off-node
+    demonstrates: Frozen host-component flow signatures (kubelet, container runtime, kube-proxy, CNI, node agent, every hostNetwork Pod) classify pilot benign host egress; a benign undeclared host daemon is run as the host-context collision negative control.
+    failure_rule: Unmatched benign host flows keep host-context conditional and count against its precision.
+    status: not_run

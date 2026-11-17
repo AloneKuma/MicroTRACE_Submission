@@ -1,0 +1,49 @@
+# Audit policy of the GRE test cluster. Exp. 5 grades outcomes from these
+# records, not from the GRE's own A_resp, and 7.3 reconciles interrupted
+# submissions from them. The first matching rule applies.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages: ["RequestReceived"]
+rules:
+  # Token requests: never log the body, which would contain the token.
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["serviceaccounts/token"]
+  # Every write by the executor or a response ServiceAccount, with the
+  # request and response objects.
+  - level: RequestResponse
+    users:
+      - system:serviceaccount:microtrace:gre-executor
+      - system:serviceaccount:microtrace:gre-isolate
+      - system:serviceaccount:microtrace:gre-cordon
+      - system:serviceaccount:microtrace:gre-scale
+      - system:serviceaccount:microtrace:gre-revoke
+      - system:serviceaccount:microtrace:gre-verify
+      - system:serviceaccount:microtrace:gre-broad          # 7.5 ablation runs only
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+  # Their reads (target revalidation), metadata only.
+  - level: Metadata
+    users:
+      - system:serviceaccount:microtrace:gre-executor
+      - system:serviceaccount:microtrace:gre-isolate
+      - system:serviceaccount:microtrace:gre-cordon
+      - system:serviceaccount:microtrace:gre-scale
+      - system:serviceaccount:microtrace:gre-revoke
+      - system:serviceaccount:microtrace:gre-verify
+      - system:serviceaccount:microtrace:gre-broad          # 7.5 ablation runs only
+  # Writes to the objects the actions touch, by anyone (the test harness
+  # and controllers), so resource changes around an attempt are visible.
+  - level: Metadata
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+    resources:
+      - group: ""
+        resources: ["pods", "nodes"]
+      - group: "apps"
+        resources: ["deployments", "deployments/scale", "statefulsets", "statefulsets/scale"]
+      - group: "rbac.authorization.k8s.io"
+        resources: ["rolebindings"]
+      - group: "admissionregistration.k8s.io"
+        resources: ["validatingadmissionpolicies", "validatingadmissionpolicybindings"]
+  # Everything else is not needed by Exp. 5.
+  - level: None

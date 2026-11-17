@@ -1,0 +1,14 @@
+# Roundtrip fault plan: clock skew (250 ms shift, undeclared)
+# Stage: source — faultinject shifts event_time and source_time by +250 ms
+# without raising clock_uncertainty_ns.  The pipeline still delivers the records
+# but their timestamps are wrong relative to watermarks.
+# Expected reconcile: all records received; no drops; watermark violation visible
+# in the verify suite (time check) but delivery is complete.
+version: faultplan.v0
+seed: 20261011
+faults:
+  - id: node-clock-skew-250ms
+    kind: skew
+    stage: source
+    offset: 250ms
+    declare_uncertainty: false

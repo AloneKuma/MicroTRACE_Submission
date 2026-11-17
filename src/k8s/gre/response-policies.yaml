@@ -1,0 +1,205 @@
+# ValidatingAdmissionPolicies for the response ServiceAccounts
+# (design-spec section 4). Enforced by the API server, so they hold when the
+# executor is compromised: each account may make only its one kind of change.
+# failurePolicy Fail: an expression that cannot be evaluated denies. An empty
+# request.subResource is absent, not "", so it is tested with has(). No GRE
+# account has RBAC on admission policies, so it cannot change them.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: gre-isolate}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["*"]
+        resources: ["pods", "pods/*"]
+  matchConditions:
+    - name: isolate-account
+      expression: request.userInfo.username == "system:serviceaccount:microtrace:gre-isolate"
+  validations:
+    - expression: >-
+        request.operation == "UPDATE" && (!has(request.subResource) || request.subResource == "")
+      message: gre-isolate may only update a Pod
+    - expression: >-
+        has(object.metadata.labels) && "microtrace.io/isolated" in object.metadata.labels &&
+        object.metadata.labels["microtrace.io/isolated"] == "true"
+      message: gre-isolate must set microtrace.io/isolated=true
+    - expression: >-
+        !has(oldObject.metadata.labels) || oldObject.metadata.labels.all(k,
+        k in object.metadata.labels && object.metadata.labels[k] == oldObject.metadata.labels[k])
+      message: gre-isolate may not change or remove other labels
+    - expression: >-
+        object.metadata.labels.all(k, k == "microtrace.io/isolated" ||
+        (has(oldObject.metadata.labels) && k in oldObject.metadata.labels))
+      message: gre-isolate may not add other labels
+    - expression: object.spec == oldObject.spec
+      message: gre-isolate may not change the Pod spec
+    - expression: >-
+        has(object.metadata.annotations) == has(oldObject.metadata.annotations) &&
+        (!has(object.metadata.annotations) || object.metadata.annotations == oldObject.metadata.annotations)
+      message: gre-isolate may not change annotations
+    - expression: >-
+        has(object.metadata.ownerReferences) == has(oldObject.metadata.ownerReferences) &&
+        (!has(object.metadata.ownerReferences) || object.metadata.ownerReferences == oldObject.metadata.ownerReferences)
+      message: gre-isolate may not change owner references
+    - expression: >-
+        has(object.metadata.finalizers) == has(oldObject.metadata.finalizers) &&
+        (!has(object.metadata.finalizers) || object.metadata.finalizers == oldObject.metadata.finalizers)
+      message: gre-isolate may not change finalizers
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: gre-isolate}
+spec:
+  policyName: gre-isolate
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: gre-cordon}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["*"]
+        resources: ["nodes", "nodes/*"]
+  matchConditions:
+    - name: cordon-account
+      expression: request.userInfo.username == "system:serviceaccount:microtrace:gre-cordon"
+  validations:
+    - expression: >-
+        request.operation == "UPDATE" && (!has(request.subResource) || request.subResource == "")
+      message: gre-cordon may only update a Node
+    - expression: has(object.spec.unschedulable) && object.spec.unschedulable == true
+      message: gre-cordon must set spec.unschedulable=true
+    - expression: >-
+        has(object.spec.taints) == has(oldObject.spec.taints) &&
+        (!has(object.spec.taints) || object.spec.taints == oldObject.spec.taints)
+      message: gre-cordon may not change taints
+    - expression: >-
+        has(object.spec.podCIDR) == has(oldObject.spec.podCIDR) &&
+        (!has(object.spec.podCIDR) || object.spec.podCIDR == oldObject.spec.podCIDR) &&
+        has(object.spec.providerID) == has(oldObject.spec.providerID) &&
+        (!has(object.spec.providerID) || object.spec.providerID == oldObject.spec.providerID)
+      message: gre-cordon may not change other Node spec fields
+    - expression: >-
+        has(object.metadata.labels) == has(oldObject.metadata.labels) &&
+        (!has(object.metadata.labels) || object.metadata.labels == oldObject.metadata.labels)
+      message: gre-cordon may not change labels
+    - expression: >-
+        has(object.metadata.annotations) == has(oldObject.metadata.annotations) &&
+        (!has(object.metadata.annotations) || object.metadata.annotations == oldObject.metadata.annotations)
+      message: gre-cordon may not change annotations
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: gre-cordon}
+spec:
+  policyName: gre-cordon
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: gre-scale}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["*"]
+        resources: ["deployments", "deployments/*", "statefulsets", "statefulsets/*"]
+  matchConditions:
+    - name: scale-account
+      expression: request.userInfo.username == "system:serviceaccount:microtrace:gre-scale"
+  validations:
+    - expression: >-
+        request.operation == "UPDATE" && has(request.subResource) && request.subResource == "scale"
+      message: gre-scale may only update the scale subresource
+    - expression: "!has(object.spec.replicas) || object.spec.replicas == 0"      # 0 is omitted from a Scale
+      message: gre-scale may only set replicas to 0
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: gre-scale}
+spec:
+  policyName: gre-scale
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: gre-revoke}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["rbac.authorization.k8s.io"]
+        apiVersions: ["v1"]
+        operations: ["*"]
+        resources: ["rolebindings"]
+  matchConditions:
+    - name: revoke-account
+      expression: request.userInfo.username == "system:serviceaccount:microtrace:gre-revoke"
+  validations:
+    - expression: request.operation == "DELETE"
+      message: gre-revoke may only delete a RoleBinding
+    - expression: >-
+        !(request.namespace in ["kube-system", "kube-public", "kube-node-lease", "microtrace"])
+      message: gre-revoke may not touch system or MicroTRACE namespaces
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: gre-revoke}
+spec:
+  policyName: gre-revoke
+  validationActions: [Deny]
+---
+# gre-verify (7.4) may only create and delete probe Pods: one container from
+# a pinned probe image, no init or ephemeral containers, no token, no host
+# namespaces or ports. The restricted Pod Security level of
+# microtrace-probe covers privileges, users and capabilities.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata: {name: gre-verify}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["*"]
+        resources: ["pods", "pods/*"]
+  matchConditions:
+    - name: verify-account
+      expression: request.userInfo.username == "system:serviceaccount:microtrace:gre-verify"
+  validations:
+    - expression: >-
+        (request.operation == "CREATE" || request.operation == "DELETE") &&
+        (!has(request.subResource) || request.subResource == "")
+      message: gre-verify may only create and delete probe Pods
+    - expression: request.namespace == "microtrace-probe"
+      message: gre-verify may only act in microtrace-probe
+    - expression: >-
+        request.operation == "DELETE" || (size(object.spec.containers) == 1 &&
+        object.spec.containers[0].image in [
+          "registry.k8s.io/e2e-test-images/agnhost:2.53@sha256:99c6b4bb4a1e1df3f0b3752168c89358794d02258ebebc26bf21c29399011a85",
+          "registry.k8s.io/pause:3.10"])
+      message: gre-verify may only run one container from a pinned probe image
+    - expression: >-
+        request.operation == "DELETE" || (!has(object.spec.initContainers) && !has(object.spec.ephemeralContainers))
+      message: gre-verify may not add init or ephemeral containers
+    - expression: >-
+        request.operation == "DELETE" || (has(object.spec.automountServiceAccountToken) &&
+        object.spec.automountServiceAccountToken == false)
+      message: gre-verify probe Pods may not mount a token
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata: {name: gre-verify}
+spec:
+  policyName: gre-verify
+  validationActions: [Deny]

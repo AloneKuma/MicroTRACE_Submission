@@ -1,0 +1,63 @@
+# MicroTRACE candidate Kubernetes audit policy, version audit-policy.v0
+#
+# Status: DESIGN CANDIDATE for a self-managed control plane (kube-apiserver
+# --audit-policy-file). Not installed or tested on any cluster. A managed
+# control plane (EKS, GKE, AKS) does not accept this file; record the
+# provider's effective policy with provider-coverage.template.yaml instead.
+#
+# Semantics relied on (Kubernetes auditing documentation):
+# - Rules are evaluated in order; the FIRST matching rule sets the level.
+# - Metadata = request metadata, no bodies. RequestResponse = request and
+#   response bodies (not for non-resource requests).
+# - omitStages suppresses events for those stages; they cannot be recovered.
+# - A request that fails authentication is audited at stage ResponseStarted
+#   with no authenticated user (apiserver WithFailedAuthenticationAudit), so
+#   ResponseStarted must not be omitted on the rules that match it (B2).
+#
+# Rule order is deliberate. Rule 1 must precede Rule 2 so that credential-
+# bearing objects can never be logged with bodies, whatever later rules say.
+# spec/tools/check_gap1.py simulates first-match evaluation for every
+# audit-dependent finding and asserts the credential cap.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+# No policy-wide omitStages: each rule states its own.
+rules:
+  # Rule 1 - credential cap. Secrets (H3), TokenRequest (issuance JTI
+  # annotation, D/G1b), TokenReview, and ConfigMaps are logged at Metadata
+  # only. A TokenRequest response body contains the issued token; the
+  # issued-credential-id annotation is recorded without the body.
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps", "serviceaccounts/token"]
+      - group: "authentication.k8s.io"
+        resources: ["tokenreviews"]
+    omitStages: ["RequestReceived"]
+
+  # Rule 2 - RBAC mutation bodies for F2 historical-rights reconstruction,
+  # including updates made by the ClusterRole aggregation controller. Bodies
+  # go to protected raw evidence only (collector-contract.md).
+  - level: RequestResponse
+    verbs: ["create", "update", "patch", "delete", "deletecollection"]
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+    omitStages: ["RequestReceived"]
+
+  # Rule 3 - interactive container access for G2. The verb is not restricted:
+  # a WebSocket exec starts as GET and SPDY as POST, and the recorded verb on
+  # the pinned version is a Gap 2 check (AUD-EXEC-VERB). ResponseStarted is
+  # kept because it records the accepted upgrade of a long-running request.
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["pods/exec", "pods/attach"]
+    omitStages: ["RequestReceived"]
+
+  # Rule 4 - catch-all at Metadata for every other request, including
+  # non-resource URLs and unauthenticated requests: B1 (read/list/watch
+  # diversity), B2 (401 at ResponseStarted), B3 (request rate), D2 and G1b
+  # use side (user.extra), and every RBAC read. No None rules: any volume
+  # reduction must be justified against spec/rules/rulebook.v0.yaml inputs.
+  - level: Metadata
+    omitStages: ["RequestReceived"]

@@ -1,0 +1,8 @@
+# PROPOSED (worklog section 4, P-1): event loss, 05 % of every record, transit stage.
+version: faultplan.v0
+seed: 3051
+faults:
+  - id: loss-transit-05
+    kind: loss
+    stage: transit
+    rate: 0.05

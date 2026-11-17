@@ -1,0 +1,21 @@
+# Exp. 4 time caps, per unit (one GO process: OVERLAY runs) or per command step, in seconds. A unit past
+# its cap is stopped and recorded as capped: that configuration is infeasible on it ("feasible workloads
+# only"). APPROVED rule (user 2026-11-16; worklog section 4): cap = max(600 s, 20 x the largest unit wall time of that
+# configuration and workload in the development dry run), rounded up to 60 s; derive-caps prints it.
+# workload * = any. Command steps: config <command>:<action>.
+config	workload	unit_cap_s	note
+full	*	600	APPROVED: PILOT dry run max unit 18.6 s (no_index m4), 20x below the 600 s floor
+no_index	*	600	APPROVED (600 s floor)
+unbounded	*	600	APPROVED (600 s floor)
+exhaustive	*	600	APPROVED (600 s floor)
+reduced_k	*	600	APPROVED (600 s floor)
+reduced_l	*	600	APPROVED (600 s floor)
+reduced_t	*	600	APPROVED (600 s floor)
+orthrus:prep	*	21600	APPROVED: session B1 took 4.2 h to convert + 0.2 h DB load (BASELINES_STATUS 15:57-20:22); cap ~1.3x
+orthrus:train	*	4320	APPROVED: 2 x session B1 ORTHRUS training, 36 min (heldout-b1 summary.tsv)
+orthrus:detect	*	600	APPROVED: no-op under Q2 option (c)
+stub:prep	*	60	local dry run only
+stub:train	*	60	local dry run only
+stub:detect	*	60	local dry run only
+stub_slow:prep	*	60	local dry run only
+stub_slow:detect	*	5	local dry run only: must be capped

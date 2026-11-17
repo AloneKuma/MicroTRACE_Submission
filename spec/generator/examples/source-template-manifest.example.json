@@ -1,0 +1,298 @@
+{
+  "manifest_version": "source-template-manifest.v0",
+  "created_at": "2026-10-09T10:00:00Z",
+  "description": "Template manifest for MicroTRACE generator: benign-background template pool assignments and intake cards",
+  "sources": [
+    {
+      "name": "BETH",
+      "status": "accepted-template",
+      "intake_card": {
+        "accepted_fields": [
+          "timestamp",
+          "process_name",
+          "user_id",
+          "group_id",
+          "syscall_name",
+          "syscall_args",
+          "return_value",
+          "duration_us"
+        ],
+        "benign_row_definition": "evil=0 AND sus=0",
+        "transformation": "Boot-relative timestamp → absolute via host-start time; PID reuse handled by adding process start time; host name replaced with Pod UID",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "training hosts (except ubuntu, which has ambiguous labels)",
+            "estimated_record_count": 250000
+          },
+          "held_out_pool": {
+            "split_criteria": "validation hosts (except ubuntu)",
+            "estimated_record_count": 180000
+          },
+          "excluded": {
+            "reason": "test host (evil=1); ubuntu host (ambiguous classification)",
+            "estimated_record_count": 145000
+          }
+        },
+        "fitted_parameters": [
+          {
+            "symbol": "E_D1",
+            "fitted_on": "DEV pool",
+            "metric": "token-reader workloads identified by (uid, process_name)"
+          },
+          {
+            "symbol": "E_E2",
+            "fitted_on": "DEV pool",
+            "metric": "executable writes post-start (e.g., cache population, module loading)"
+          }
+        ]
+      },
+      "licence_info": {
+        "licence_id": "Apache-2.0",
+        "status": "public",
+        "attribution": "BETH: A Dataset for Behavior-based Intrusion Detection on Enterprise Terminals (Balaji et al., UDL 2021)",
+        "url": "https://www.gatsby.ucl.ac.uk/~balaji/udl2021/accepted-papers/UDL2021-paper-033.pdf",
+        "permitted_uses": ["research", "derivative", "benchmark"],
+        "forbidden_uses": [],
+        "redistribution_note": "Permitted; attribution required"
+      },
+      "file_level_hashes": {
+        "beth_training_host1.csv.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "beth_training_host2.csv.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "LID-DS-2021",
+      "status": "accepted-template",
+      "intake_card": {
+        "accepted_fields": [
+          "syscall_name",
+          "syscall_args",
+          "return_value",
+          "timestamp",
+          "process_path",
+          "process_uid",
+          "container_id"
+        ],
+        "benign_row_definition": "exploit=false",
+        "transformation": "Docker container ID → Pod UID; recording-relative timestamp → absolute via recording start time; syscall arguments parsed from JSON",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "training and validation recordings",
+            "estimated_record_count": 380000
+          },
+          "held_out_pool": {
+            "split_criteria": "test/normal recordings",
+            "estimated_record_count": 210000
+          },
+          "excluded": {
+            "reason": "exploit=true (attack recordings); never use attack-labelled data",
+            "estimated_record_count": 520000
+          }
+        },
+        "fitted_parameters": [
+          {
+            "symbol": "E_E2",
+            "fitted_on": "DEV pool",
+            "metric": "executable writes and chmod patterns in container runtime syscalls"
+          },
+          {
+            "symbol": "E_F1",
+            "fitted_on": "DEV pool",
+            "metric": "privilege transitions (setuid, setgid, setreuid) per workload"
+          }
+        ]
+      },
+      "licence_info": {
+        "licence_id": "MIT",
+        "status": "public",
+        "attribution": "LID-DS: Intrusion Detection on Containers (LID-DS team, GitHub)",
+        "url": "https://github.com/LID-DS/LID-DS/blob/master/LICENSE",
+        "permitted_uses": ["research", "commercial", "derivative", "benchmark"],
+        "forbidden_uses": [],
+        "redistribution_note": "Permitted under MIT; attribution and copyright notice required"
+      },
+      "file_level_hashes": {
+        "PHP_CWE-434_training.tar.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "PHP_CWE-434_test_normal.tar.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b856"
+      }
+    },
+    {
+      "name": "CSIC-2010",
+      "status": "accepted-template",
+      "intake_card": {
+        "accepted_fields": [
+          "timestamp",
+          "method",
+          "url",
+          "query_string",
+          "request_body",
+          "response_code",
+          "response_body_length",
+          "request_headers"
+        ],
+        "benign_row_definition": "native_label.label='norm' (original CSIC labelling)",
+        "transformation": "CSV → JSON; URL-decoded query strings; relative timestamp → absolute via dataset start time; HTTP method and status codes preserved",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "full file; norm-labelled rows",
+            "estimated_record_count": 85000
+          },
+          "held_out_pool": {
+            "split_criteria": "norm_test file",
+            "estimated_record_count": 45000
+          },
+          "excluded": {
+            "reason": "anom-labelled rows (attack requests); never use attack-labelled data",
+            "estimated_record_count": 34000
+          }
+        },
+        "fitted_parameters": [
+          {
+            "symbol": "Q_B1",
+            "fitted_on": "DEV pool",
+            "metric": "HTTP method/URL/header shape distribution"
+          }
+        ]
+      },
+      "licence_info": {
+        "licence_id": "CC-BY-4.0",
+        "status": "public",
+        "attribution": "CSIC 2010 HTTP dataset (conversion by lexr.ai, RAW-RFC2616_escd_v02); original CSIC 2010 dataset",
+        "url": "https://petescully.co.uk/research/csic-2010-http-dataset-in-csv-format-for-weka-analysis/",
+        "permitted_uses": ["research", "commercial", "derivative", "benchmark"],
+        "forbidden_uses": [],
+        "redistribution_note": "CC-BY-4.0: permit derivative and commercial use with attribution; name the conversion and its author (lexr.ai)"
+      },
+      "file_level_hashes": {
+        "CSIC_full.csv.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b857",
+        "CSIC_norm_test.csv.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b858"
+      }
+    },
+    {
+      "name": "K8NTEXT",
+      "status": "accepted-template",
+      "intake_card": {
+        "accepted_fields": [
+          "audit_verb",
+          "audit_api_group",
+          "audit_resource",
+          "audit_user",
+          "audit_stage",
+          "audit_timestamp",
+          "request_object",
+          "response_object"
+        ],
+        "benign_row_definition": "All rows in K8NTEXT are from real operator actions; no evil or attack distinction",
+        "transformation": "Kubernetes API audit JSON → normalized audit event; timestamps already UTC; user identities preserved as operator ServiceAccount",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "Earlier contiguous segment of the 20 audit segments (segments 1–10)",
+            "estimated_record_count": 65000
+          },
+          "held_out_pool": {
+            "split_criteria": "Later contiguous segment (segments 11–20)",
+            "estimated_record_count": 62000
+          },
+          "excluded": {
+            "reason": "None; K8NTEXT is wholly benign; no attack/benign split applied",
+            "estimated_record_count": 0
+          }
+        },
+        "fitted_parameters": [
+          {
+            "symbol": "S_B1",
+            "fitted_on": "DEV pool",
+            "metric": "API verb/resource/namespace baseline per real operator ServiceAccount"
+          },
+          {
+            "symbol": "Q_B3",
+            "fitted_on": "DEV pool",
+            "metric": "Request rate baseline per principal"
+          }
+        ]
+      },
+      "licence_info": {
+        "licence_id": "CC BY-NC-ND 4.0",
+        "status": "local-only",
+        "attribution": "K8NTEXT v1.0.0: Kubernetes Audit Trail Dataset (Fang et al., GitHub)",
+        "url": "https://github.com/daisyfbk/k8ntext/releases/tag/v1.0.0",
+        "permitted_uses": ["research"],
+        "forbidden_uses": ["commercial", "derivative"],
+        "redistribution_note": "CC BY-NC-ND 4.0: non-commercial, non-derivative. K8NTEXT-derived fragments and parameters may not be redistributed without licensor consent. Flag generated outputs as 'local-only' if K8NTEXT templates were used."
+      },
+      "file_level_hashes": {
+        "k8ntext_v1.0.0_segments_1_10.jsonl.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b859"
+      }
+    },
+    {
+      "name": "Kube-IDS0",
+      "status": "unverified",
+      "intake_card": {
+        "accepted_fields": [],
+        "benign_row_definition": "Label legend not yet recorded from publisher; decision deferred",
+        "transformation": "Pending label legend confirmation",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "Decided on intake card after legend is known; by capture",
+            "estimated_record_count": 0
+          },
+          "held_out_pool": {
+            "split_criteria": "Decided on intake card after legend is known; by capture",
+            "estimated_record_count": 0
+          },
+          "excluded": {
+            "reason": "Attack-labelled and unlabelled rows (pending definition)",
+            "estimated_record_count": 0
+          }
+        },
+        "fitted_parameters": []
+      },
+      "licence_info": {
+        "licence_id": "unknown",
+        "status": "restricted",
+        "attribution": "Kube-IDS0 (Kaggle dataset, version not recorded)",
+        "url": "https://www.kaggle.com/datasets/redamorsli/kube-ids0",
+        "permitted_uses": [],
+        "forbidden_uses": ["distribution"],
+        "redistribution_note": "Licence terms not yet recorded. Kube-IDS0 is blocked for template use until the label legend and licence terms are confirmed from the publisher."
+      },
+      "file_level_hashes": {}
+    },
+    {
+      "name": "DARPA-TC-E3-CADETS",
+      "status": "external-only",
+      "intake_card": {
+        "accepted_fields": [],
+        "benign_row_definition": "Not used as a template; external comparison only",
+        "transformation": "Not used for templates; attack sessions are read as scenario descriptions",
+        "pool_assignment": {
+          "dev_pool": {
+            "split_criteria": "External only; no pool",
+            "estimated_record_count": 0
+          },
+          "held_out_pool": {
+            "split_criteria": "External only; no pool",
+            "estimated_record_count": 0
+          },
+          "excluded": {
+            "reason": "Entire dataset external; used for independent KAIROS host-provenance baseline only",
+            "estimated_record_count": 0
+          }
+        },
+        "fitted_parameters": []
+      },
+      "licence_info": {
+        "licence_id": "DARPA TC Public",
+        "status": "public",
+        "attribution": "DARPA Transparent Computing (TC) E3 CADETS dataset and ground truth (GitHub)",
+        "url": "https://github.com/darpa-i2o/Transparent-Computing/blob/master/README-E3.md",
+        "permitted_uses": ["research", "benchmark"],
+        "forbidden_uses": [],
+        "redistribution_note": "Public dataset; attack sessions (Nginx/drakon implant, privilege escalation, port scan) are cited as scenario descriptions but never copied into the generated Kubernetes world."
+      },
+      "file_level_hashes": {
+        "cadets_session_1.tar.gz": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85a"
+      }
+    }
+  ]
+}

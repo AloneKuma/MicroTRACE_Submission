@@ -1,0 +1,174 @@
+// MicroTRACE Gap 1 schema v0: dataset records for evaluation and later ML.
+// See spec/data/ml-data-design.md. Detectors and the orchestrator never
+// consume GroundTruthAction; it is written by the scenario harness and kept
+// in an access-separated store.
+syntax = "proto3";
+
+package microtrace.v0;
+
+import "google/protobuf/timestamp.proto";
+import "microtrace/v0/common.proto";
+import "microtrace/v0/finding.proto";
+import "microtrace/v0/witness.proto";
+
+enum DataSplit {
+  DATA_SPLIT_UNSPECIFIED = 0;
+  // Gap 2 feasibility runs; never used to choose parameters or train models.
+  FEASIBILITY = 1;
+  // Pilot runs; parameters, baselines, declared artifacts, and models are
+  // fitted here only.
+  PILOT = 2;
+  // Extra runs collected for model development; same rule as PILOT.
+  RESEARCH = 3;
+  // Held-out runs; sealed until the configuration is frozen.
+  HELD_OUT = 4;
+  // Hand-made schema examples; not data.
+  SYNTHETIC_EXAMPLE = 5;
+}
+
+// Carried on every envelope so every archived record knows its run, split,
+// and the capture profile that produced it.
+message RunContext {
+  string run_id = 1;
+  DataSplit split = 2;
+  // Capture-manifest profile, e.g. "research-superset-v0".
+  string capture_profile = 3;
+  string parameter_set_version = 4;
+  // SHA-256 of the compiled descriptor set used to encode this record, so
+  // archived binary records stay decodable after schema changes.
+  string descriptor_set_sha256 = 5;
+}
+
+// One scripted action of a scenario or of the benign background workload.
+message GroundTruthAction {
+  string run_id = 1;
+  uint64 action_seq = 2;
+  string scenario_id = 3;
+  string variant_id = 4;
+  string step_label = 5;
+  bool is_attack = 6;
+  // Declared before the run, never edited after results are seen.
+  repeated string expected_finding_types = 7;
+  optional Tactic intended_tactic = 8;
+  repeated EntityRef actors = 9;
+  repeated EntityRef targets = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Timestamp ended_at = 12;
+  string harness_version = 13;
+  // Harness-observed outcome (e.g. command exit status), not a detector result.
+  // For a generated run: the scripted effect in the generated world, e.g.
+  // "effect_realized" or "attempt_failed"; an attempt is never relabeled.
+  string harness_outcome = 14;
+  // expected_finding_types must equal the finding_type set of this action's
+  // FindingOpportunity records with expected_state PRESENT; the opportunity
+  // records are the scoring unit (unified-dataset-schema.md).
+
+  // Generated runs only (empty for a live harness): event IDs
+  // (NormalizedEvent.event_id = Envelope.logical_id) of every observation the
+  // generator rendered for this action. Lets the scorer map a finding's
+  // input_event_ids, and a link's evidence, back to actions.
+  repeated string rendered_event_ids = 15;
+}
+
+// What the scorer expects for one finding opportunity or one action pair.
+enum TruthExpectation {
+  TRUTH_EXPECTATION_UNSPECIFIED = 0;
+  // Required evidence was rendered and coverage is known: must fire or link.
+  PRESENT = 1;
+  // Benign lookalike or hard nonlink: must not fire or link.
+  ABSENT = 2;
+  // Evidence missing, ambiguous or covered by a gap: abstention is correct
+  // and neither firing nor not firing is scored as an error.
+  UNOBSERVABLE = 3;
+}
+
+// Offline truth for generated runs (dataset-generator-design.md, section 4).
+// FindingOpportunity and ActionLink are written by the generator directly to
+// the access-separated truth store. They have no Envelope kind and never
+// travel on Kafka.
+
+// One scoring unit for one finding type in one window.
+message FindingOpportunity {
+  string run_id = 1;
+  string opportunity_id = 2;
+  // GroundTruthAction.action_seq this opportunity belongs to (attack step or
+  // benign lookalike).
+  uint64 action_seq = 3;
+  // Table I ID, e.g. "D1".
+  string finding_type = 4;
+  google.protobuf.Timestamp window_start = 5;
+  google.protobuf.Timestamp window_end = 6;
+  TruthExpectation expected_state = 7;
+  // The rule's rulebook `inputs` field paths and `context_joins` that the run
+  // rendered (or, for UNOBSERVABLE, the ones that are missing).
+  repeated string evidence_requirements = 8;
+  // Required for ABSENT and UNOBSERVABLE: why the expected state holds.
+  string reason = 9;
+  string truth_version = 10;
+  // Event IDs of the rendered observations that make up (or, for ABSENT,
+  // imitate) this opportunity's evidence. A finding matches the opportunity
+  // when its finding_type is equal and its input_event_ids intersect these.
+  repeated string evidence_event_ids = 11;
+}
+
+// One directed action pair: a link the GO should admit, or a hard nonlink it
+// should reject.
+message ActionLink {
+  string run_id = 1;
+  string link_id = 2;
+  uint64 from_action_seq = 3;
+  uint64 to_action_seq = 4;
+  // Instance witness that independently establishes the link. Unspecified
+  // for a hard nonlink.
+  WitnessType witness_type = 5;
+  TruthExpectation expected_state = 6;
+  // For a hard nonlink: the visible keys the two actions share without a
+  // witness, e.g. "pod_uid", "pod_ip", "principal", "trace_id", "time".
+  repeated string shared_keys = 7;
+  string reason = 8;
+  string truth_version = 9;
+}
+
+// One attack or benign incident in a generated run: the actions that belong
+// together, against which correlator incidents are scored for merges (one
+// correlator incident holding actions of two truth incidents) and
+// fragmentation (one truth incident split over correlator incidents). By
+// default one incident per scenario execution; a scenario's decoy and twin
+// steps (benign) form an incident per float group (exp2-gaps-plan B1).
+message GroundTruthIncident {
+  string run_id = 1;
+  string incident_id = 2;
+  repeated uint64 action_seqs = 3;
+  bool is_attack = 4;
+  string scenario_id = 5;
+  string truth_version = 6;
+}
+
+enum EvaluationOutcome {
+  EVALUATION_OUTCOME_UNSPECIFIED = 0;
+  FIRED = 1;
+  // Inputs complete and predicate false.
+  NOT_FIRED = 2;
+  // Required input absent or covered by a completeness gap.
+  ABSTAINED = 3;
+}
+
+// One rule evaluation for one state key and window. Provides the negatives
+// and abstentions that positive findings alone cannot supply.
+message RuleEvaluation {
+  string evaluation_id = 1;
+  // Table I ID, e.g. "D1".
+  string rule_id = 2;
+  // Hex of the agent-topic key bytes the rule state lives under.
+  string state_key_hex = 3;
+  google.protobuf.Timestamp window_start = 4;
+  google.protobuf.Timestamp window_end = 5;
+  EvaluationOutcome outcome = 6;
+  repeated GapReason abstain_reasons = 7;
+  repeated string input_event_ids = 8;
+  optional string finding_id = 9;
+  // Rule features actually computed (e.g. "distinct_resource_count" -> "14").
+  map<string, string> features = 10;
+  string detector_version = 11;
+  string parameter_set_version = 12;
+}

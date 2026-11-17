@@ -1,0 +1,227 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MicroTRACE Generator Specification Schema",
+  "description": "Machine-checkable schema for generator-spec.v0.yaml: world sizes, service topologies, churn models, background profiles, observability models, and clock models",
+  "type": "object",
+  "required": ["schema_version", "status", "worlds", "service_graph_shapes", "churn_and_reuse", "background_profiles", "observability_profiles", "clock_models", "declared_artifacts"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^generator-spec\\.v[0-9]+$",
+      "description": "Schema version identifier"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unfrozen", "pilot", "frozen"],
+      "description": "Specification lifecycle status"
+    },
+    "description": {
+      "type": "string"
+    },
+    "worlds": {
+      "type": "object",
+      "description": "Named world topology definitions",
+      "properties": {
+        "Small": { "$ref": "#/definitions/world" },
+        "Reference": { "$ref": "#/definitions/world" },
+        "Large": { "$ref": "#/definitions/world" }
+      },
+      "additionalProperties": false
+    },
+    "service_graph_shapes": {
+      "type": "object",
+      "description": "Named service topology patterns",
+      "additionalProperties": {
+        "$ref": "#/definitions/service_graph_shape"
+      }
+    },
+    "churn_and_reuse": {
+      "type": "object",
+      "description": "Pod and process lifecycle patterns",
+      "properties": {
+        "pod_delete_recreate": { "$ref": "#/definitions/churn_pattern" },
+        "pod_ip_reuse": { "$ref": "#/definitions/churn_pattern" },
+        "process_pid_reuse": { "$ref": "#/definitions/churn_pattern" },
+        "token_rotation": { "$ref": "#/definitions/churn_pattern" },
+        "image_rollouts": { "$ref": "#/definitions/churn_pattern" }
+      }
+    },
+    "background_profiles": {
+      "type": "object",
+      "description": "Benign workload activity profiles",
+      "properties": {
+        "request_rates": { "type": "object" },
+        "process_activity": { "type": "object" },
+        "audit_activity": { "type": "object" }
+      }
+    },
+    "observability_profiles": {
+      "type": "object",
+      "description": "Data quality and coverage models",
+      "properties": {
+        "clean": { "$ref": "#/definitions/observability_profile" },
+        "degraded_gateway": { "$ref": "#/definitions/observability_profile" },
+        "degraded_audit": { "$ref": "#/definitions/observability_profile" },
+        "degraded_ebpf": { "$ref": "#/definitions/observability_profile" },
+        "degraded_context": { "$ref": "#/definitions/observability_profile" }
+      }
+    },
+    "clock_models": {
+      "type": "object",
+      "description": "Time basis and uncertainty per source family",
+      "properties": {
+        "gateway": { "$ref": "#/definitions/clock_model" },
+        "audit": { "$ref": "#/definitions/clock_model" },
+        "ebpf": { "$ref": "#/definitions/clock_model" },
+        "context": { "$ref": "#/definitions/clock_model" }
+      }
+    },
+    "declared_artifacts": {
+      "type": "object",
+      "description": "Baseline and pattern artifacts used by findings",
+      "additionalProperties": {
+        "$ref": "#/definitions/declared_artifact"
+      }
+    },
+    "run_context": {
+      "type": "object",
+      "description": "Metadata schema for generated runs"
+    },
+    "determinism": {
+      "type": "object",
+      "description": "Determinism and reproducibility contract"
+    }
+  },
+  "definitions": {
+    "world": {
+      "type": "object",
+      "required": ["description", "logical_kubernetes_workers", "application_services", "concurrent_pods", "concurrent_containers"],
+      "properties": {
+        "description": { "type": "string" },
+        "logical_kubernetes_workers": { "$ref": "#/definitions/numeric_param" },
+        "application_services": { "$ref": "#/definitions/numeric_param" },
+        "concurrent_pods": {
+          "type": "object",
+          "required": ["pilot_default", "frozen"],
+          "properties": {
+            "description": { "type": "string" },
+            "pilot_default": { "type": "integer", "minimum": 1 },
+            "frozen": { "type": ["null", "integer"] }
+          }
+        },
+        "concurrent_containers": { "$ref": "#/definitions/numeric_param" },
+        "pod_delete_recreate_transitions": { "$ref": "#/definitions/numeric_param" },
+        "sidecar_containers": { "$ref": "#/definitions/numeric_param" }
+      }
+    },
+    "numeric_param": {
+      "type": "object",
+      "required": ["pilot_default", "frozen"],
+      "properties": {
+        "description": { "type": "string" },
+        "pilot_default": { "type": ["integer", "number", "string", "boolean"] },
+        "frozen": { "type": ["null", "integer", "number", "string", "boolean"] }
+      }
+    },
+    "service_graph_shape": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "service_domains": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "services": { "type": "integer", "minimum": 1 },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "inter_service_edges": { "type": "object" },
+        "replicas_per_service": { "$ref": "#/definitions/numeric_param" },
+        "fan_out_max": { "$ref": "#/definitions/numeric_param" },
+        "fan_in_max": { "$ref": "#/definitions/numeric_param" },
+        "queues_and_datastores": {
+          "type": "array"
+        },
+        "broker_topic_count": { "$ref": "#/definitions/numeric_param" }
+      }
+    },
+    "churn_pattern": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "enabled": { "$ref": "#/definitions/numeric_param" },
+        "frequency": { "$ref": "#/definitions/numeric_param" },
+        "interval_seconds": { "$ref": "#/definitions/numeric_param" },
+        "reuse_delay_seconds": { "$ref": "#/definitions/numeric_param" },
+        "rotation_frequency": { "$ref": "#/definitions/numeric_param" },
+        "token_lifetime_seconds": { "$ref": "#/definitions/numeric_param" },
+        "rollout_frequency": { "$ref": "#/definitions/numeric_param" },
+        "rollback_probability": { "$ref": "#/definitions/numeric_param" }
+      }
+    },
+    "observability_profile": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" }
+      },
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/definitions/numeric_param" },
+          { "type": "boolean" },
+          { "type": "string" },
+          { "type": "array" }
+        ]
+      }
+    },
+    "clock_model": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string" },
+        "time_basis": { "$ref": "#/definitions/numeric_param" },
+        "epsilon_relative": { "$ref": "#/definitions/numeric_param" },
+        "epsilon_absolute_ms": { "$ref": "#/definitions/numeric_param" },
+        "skew_per_run_ms": { "$ref": "#/definitions/numeric_param" },
+        "stage_delay_ms": { "$ref": "#/definitions/numeric_param" },
+        "cpu_clock_drift_per_core": { "$ref": "#/definitions/numeric_param" },
+        "cache_age_ms": { "$ref": "#/definitions/numeric_param" }
+      }
+    },
+    "declared_artifact": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string" },
+        "path": { "type": "string" },
+        "version_symbol": { "type": "string" },
+        "symbol": { "type": "string" },
+        "window_symbol": { "type": "string" },
+        "threshold_symbol": { "type": "string" },
+        "percentile_symbol": { "type": "string" },
+        "usage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "finding": { "type": "string" },
+              "purpose": { "type": "string" }
+            }
+          }
+        },
+        "fitted_on": { "type": "string" },
+        "measured_from": { "type": "string" },
+        "declared_per_workload": { "type": "boolean" },
+        "paths": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "frozen": { "type": "boolean" }
+      }
+    }
+  }
+}
